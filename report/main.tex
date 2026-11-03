@@ -79,14 +79,12 @@
 % PLACEHOLDERS - edit these once, they are used on every front page
 % ======================================================================
 \newcommand{\ProjectTitle}{Recall: AI Quiz Studio}
-\newcommand{\GuideName}{[Guide Name]}
-\newcommand{\GuideDesignation}{[Guide Designation]}
-\newcommand{\SubmissionMonth}{[Month Year]}
-\newcommand{\SubmissionDate}{[DD/MM/YYYY]}
-\newcommand{\MemberOne}{[Student Name 1]}   \newcommand{\RollOne}{[Roll No. 1]}
-\newcommand{\MemberTwo}{[Student Name 2]}   \newcommand{\RollTwo}{[Roll No. 2]}
-\newcommand{\MemberThree}{[Student Name 3]} \newcommand{\RollThree}{[Roll No. 3]}
-\newcommand{\MemberFour}{[Student Name 4]}  \newcommand{\RollFour}{[Roll No. 4]}
+\newcommand{\GuideName}{Dr. Nibedan Panda}
+\newcommand{\SubmissionMonth}{\underline{\hspace{3.5cm}}}
+\newcommand{\SubmissionDate}{\underline{\hspace{3cm}}}
+\newcommand{\MemberOne}{Binayak Shome}   \newcommand{\RollOne}{23051338}
+\newcommand{\MemberTwo}{Atharva Pratap Singh}   \newcommand{\RollTwo}{23052068}
+\newcommand{\MemberThree}{Deepjyoti Bhattacharyya} \newcommand{\RollThree}{23053381}
 
 % ---------- screenshot slot ----------
 % \screenshot[width]{file-name-without-extension}{caption}{label}{what to capture}
@@ -133,7 +131,6 @@
 \textbf{\MemberOne}   & \textbf{\RollOne} \\
 \textbf{\MemberTwo}   & \textbf{\RollTwo} \\
 \textbf{\MemberThree} & \textbf{\RollThree} \\
-\textbf{\MemberFour}  & \textbf{\RollFour} \\
 \end{tabular}
 \end{center}
 }
@@ -164,7 +161,7 @@
 {\LARGE \textbf{CERTIFICATE}}\\[1cm]
 \end{center}
 
-This is to certify that the project report entitled \textbf{``\ProjectTitle''} is a bona fide record of work carried out by \textbf{\MemberOne}, \textbf{\MemberTwo}, \textbf{\MemberThree}, and \textbf{\MemberFour} under my supervision and guidance, in partial fulfilment of the requirements for the award of the Degree of Bachelor's in Computer Science and Engineering from KIIT Deemed to be University, Bhubaneswar.
+This is to certify that the project report entitled \textbf{``\ProjectTitle''} is a bona fide record of work carried out by \textbf{\MemberOne}, \textbf{\MemberTwo}, and \textbf{\MemberThree} under my supervision and guidance, in partial fulfilment of the requirements for the award of the Degree of Bachelor's in Computer Science and Engineering from KIIT Deemed to be University, Bhubaneswar.
 
 \vfill
 \noindent
@@ -176,7 +173,6 @@ This is to certify that the project report entitled \textbf{``\ProjectTitle''} i
 \raggedleft
 \textbf{Signature of Guide}\\[1cm]
 \textbf{\GuideName}\\[0.2cm]
-\GuideDesignation\\
 School of Computer Engineering\\
 KIIT Deemed to be University
 \end{minipage}
@@ -205,7 +201,6 @@ We hereby declare that the project report entitled \textbf{``\ProjectTitle''} su
 \textbf{\MemberOne} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
 \textbf{\MemberTwo} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
 \textbf{\MemberThree} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
-\textbf{\MemberFour} (\dots\dots\dots\dots\dots\dots)
 \end{minipage}
 \vspace*{1cm}
 
@@ -229,7 +224,6 @@ We also extend our sincere thanks to the Head of the Department, School of Compu
 \textbf{\MemberOne\ (\RollOne)}\\[0.15cm]
 \textbf{\MemberTwo\ (\RollTwo)}\\[0.15cm]
 \textbf{\MemberThree\ (\RollThree)}\\[0.15cm]
-\textbf{\MemberFour\ (\RollFour)}
 \end{flushright}
 \vspace*{1cm}
 
@@ -264,23 +258,50 @@ This report documents the requirements, architecture, API design, AI generation 
 {\LARGE \textbf{PROJECT CONTRIBUTORS}}\\[0.8cm]
 \end{center}
 
-\noindent \textbf{1. Technical Implementation \& Engineering Contributions} \\
-The primary technical responsibilities of each member are outlined below.
+\noindent \textbf{Member 1: \MemberOne --- AI and NLP Engineer}\
+\textit{Core intelligence of the project}\
+\textbf{Main files:} \texttt{quiz\_engine.py}
 \begin{itemize}
-\item \setlength{\itemsep}{0pt}\textbf{\MemberOne:} [Describe technical contribution, e.g.\ backend API and AI engine integration.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberTwo:} [Describe technical contribution, e.g.\ front-end single-page application.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberThree:} [Describe technical contribution, e.g.\ web research and document ingestion.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberFour:} [Describe technical contribution, e.g.\ code sandbox, testing and deployment.]
+\setlength{\itemsep}{0pt}
+\item Design prompts for generating MCQs, written questions and coding questions.
+\item Integrate the cloud AI API and the local Ollama model.
+\item Validate the generated JSON and handle invalid responses.
+\item Implement AI-based short-answer grading.
+\item Evaluate the relevance and correctness of generated questions.
 \end{itemize}
-\vspace*{0.3cm}
-\noindent \textbf{2. Individual Contribution to Project Report Preparation} \\
-Documentation responsibilities were partitioned to match each member's technical domain.
+\noindent \textbf{Viva topics:} LLMs, prompt engineering, JSON validation, API integration, model fallback, hallucinations and AI evaluation.\
+\textbf{Deliverable:} A reliable AI engine that converts extracted notes into structured assessment questions.
+\vspace*{0.4cm}
+
+\noindent \textbf{Member 2: \MemberTwo --- Backend and Assessment Engineer}\
+\textit{Document processing and execution logic}\
+\textbf{Main files:} \texttt{file\_loader.py}, \texttt{sandbox.py}
 \begin{itemize}
-\item \setlength{\itemsep}{0pt}\textbf{\MemberOne:} [Chapters authored.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberTwo:} [Chapters authored.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberThree:} [Chapters authored.]
-\item \setlength{\itemsep}{0pt}\textbf{\MemberFour:} [Chapters authored.]
+\setlength{\itemsep}{0pt}
+\item Extract text from different document formats.
+\item Handle unsupported or unreadable files.
+\item Implement Python code execution and test-case comparison.
+\item Add execution limits and improve sandbox isolation.
+\item Test document processing and coding-question workflows.
 \end{itemize}
+\noindent \textbf{Viva topics:} file parsing, exceptions, subprocesses, standard input/output, test cases, timeouts and secure execution.\
+\textbf{Deliverable:} A document-processing pipeline and a safely designed coding-assessment module.
+\vspace*{0.4cm}
+
+\noindent \textbf{Member 3: \MemberThree --- Frontend and Integration Engineer}\
+\textit{User experience and final application}\
+\textbf{Main files:} \texttt{server.py}, the web front end in \texttt{recall/static}, and the earlier Streamlit prototype (\texttt{app.py}, \texttt{theme.py})
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\item Build the user interface and responsive styling.
+\item Implement practice and exam workflows.
+\item Connect the AI engine and backend modules to the UI.
+\item Manage question navigation, timers, scoring, results and exports.
+\item Run integration tests, prepare the final demo and coordinate deployment.
+\end{itemize}
+\noindent \textbf{Viva topics:} web front end, UI state, UI design, integration, timer logic, scoring and user experience.\
+\textbf{Deliverable:} The working application that connects the AI, document-processing and assessment components.
+\vspace*{0.4cm}
 
 % ======================================================================
 % CONTENTS, FIGURES, TABLES, ABBREVIATIONS

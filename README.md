@@ -11,9 +11,11 @@ multiple-choice, written and coding questions, at Easy / Medium / Hard difficult
 - AI grading for written answers. Live test running for Python coding questions.
 - Retry-mistakes loop, history and stats (saved in your browser), JSON/Markdown export, keyboard shortcuts.
 
-## Run it (Windows)
-Double-click **`scripts/run.bat`**. It creates a virtual environment, installs everything and opens
-**http://localhost:8000**.
+## Run it (one-click)
+- Double-click **`run_recall.bat`** in the project folder to create the virtual environment,
+  install dependencies, start the app and open **http://localhost:8000** in your browser.
+- Double-click **`open_in_vscode.bat`** to open the project in VS Code, where you can press
+  **F5** and choose **Run Recall website** or run the task **Run Recall (browser)**.
 
 ## Run it (manual / VS Code terminal)
 ```bash

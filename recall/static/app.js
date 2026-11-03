@@ -138,7 +138,7 @@
   }
   function moveInk() {
     const a = $(".ctab.active"), ink = $(".ctab-ink");
-    if (!a) return;
+    if (!a || !ink) return; // tabs use a plain underline now; the sliding ink is optional
     ink.style.width = a.offsetWidth + "px";
     ink.style.transform = `translateX(${a.offsetLeft - 4}px)`;
   }
@@ -154,7 +154,7 @@
     if (st.n_mcq) parts.push(`${st.n_mcq} MCQ`);
     if (st.n_short) parts.push(`${st.n_short} written`);
     if (st.n_code) parts.push(`${st.n_code} code`);
-    $("#mixLabel").textContent = parts.join(" · ") || "No questions";
+    $("#mixLabel").textContent = parts.join(", ") || "No questions";
   }
   function buildSteppers() {
     $$(".stepper").forEach((s) => {
@@ -183,9 +183,9 @@
     renderFiles();
   }
 
-  const SUGGESTIONS = ["Operating system scheduling", "DBMS normalization", "OSI model", "Dynamic programming", "Machine learning basics", "Photosynthesis"];
+  const SUGGESTIONS = ["Operating system scheduling", "DBMS normalization", "Dynamic programming"];
   function renderSuggestions() {
-    $("#suggest").insertAdjacentHTML("beforeend", SUGGESTIONS.map((t) => `<button class="sugg" data-topic="${esc(t)}"><span class="dot"></span>${esc(t)}</button>`).join(""));
+    $("#suggest").insertAdjacentHTML("beforeend", SUGGESTIONS.map((t) => `<button class="sugg" data-topic="${esc(t)}">${esc(t)}</button>`).join(""));
   }
 
   /* ---------------- generation ---------------- */
@@ -315,7 +315,7 @@
 
   function renderQuestion() {
     const z = Q(), i = z.i, q = z.items[i], n = z.items.length, practice = z.mode === "Practice";
-    $("#quizMeta").textContent = `Question ${i + 1} of ${n} · ${z.difficulty} · ${z.mode}`;
+    $("#quizMeta").textContent = `Question ${i + 1} of ${n}. ${z.difficulty}, ${z.mode.toLowerCase()} mode.`;
     $("#progressBar").style.width = `${((i + 1) / n) * 100}%`;
 
     // navigation grid
@@ -342,7 +342,7 @@
       }).join("")}</div>`;
       if (locked) {
         const ok = picked === correctText(q);
-        body += `<div class="feedback ${ok ? "ok" : "bad"}"><b class="h">${ico(ok ? "check" : "x")}${ok ? "Correct!" : "Not quite."}</b>
+        body += `<div class="feedback ${ok ? "ok" : "bad"}"><b class="h">${ico(ok ? "check" : "x")}${ok ? "Correct." : "Not quite."}</b>
           ${ok ? "" : `The answer is <b>${esc(correctText(q))}</b>. `}${esc(q.explanation || "")}
           ${q.source_quote ? `<div class="quote">“${esc(q.source_quote)}”</div>` : ""}</div>`;
       }
@@ -391,7 +391,7 @@
     if (r.loading) return `<div class="feedback info"><b class="h">${ico("play")}Running tests…</b></div>`;
     if (r.error) return `<div class="feedback bad"><b class="h">${ico("x")}Couldn't run</b>${esc(r.error)}</div>`;
     const all = r.passed === r.total;
-    return `<div class="feedback ${all ? "ok" : "bad"}"><b class="h">${ico(all ? "check" : "x")}${all ? "All tests passed!" : `${r.passed}/${r.total} tests passed`}</b>
+    return `<div class="feedback ${all ? "ok" : "bad"}"><b class="h">${ico(all ? "check" : "x")}${all ? "All tests passed." : `${r.passed}/${r.total} tests passed`}</b>
       <div class="tests">${(r.results || []).map((t, j) => `<div class="test ${t.passed ? "pass" : "fail"}"><div class="tl">${ico(t.passed ? "check" : "x")}Test ${j + 1}</div>input:    ${esc(t.input)}\nexpected: ${esc(t.expected)}\nactual:   ${esc(t.actual)}${t.error ? "\n" + esc(t.error) : ""}</div>`).join("")}</div></div>`;
   }
 
@@ -506,7 +506,7 @@
             <circle class="val" id="ringVal" cx="100" cy="100" r="88" fill="none" stroke-width="14" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
           <div class="center"><div class="pct">${pct == null ? "—" : pct + "%"}</div><div class="sub">${total ? `${right} / ${total} correct` : "self-check"}</div></div>
         </div>
-        <div class="res-head"><div class="eyebrow">${esc(z.difficulty)} · ${esc(z.mode)} · ${esc(z.title)}</div><h1>${head}</h1><p>${sub}</p></div>
+        <div class="res-head"><div class="eyebrow">${esc(z.title)}: ${esc(z.difficulty.toLowerCase())}, ${esc(z.mode.toLowerCase())} mode</div><h1>${head}</h1><p>${sub}</p></div>
       </div>
       <div class="metrics">
         <div class="metric glass"><div class="v">${pct == null ? "—" : pct + "%"}</div><div class="l">Score</div></div>
@@ -614,14 +614,14 @@
   function renderSidebar(filter = "") {
     const f = filter.toLowerCase();
     const hist = store.get("history", []).filter((h) => !f || h.title.toLowerCase().includes(f)).slice(0, 8);
-    $("#recentList").innerHTML = hist.length ? hist.map((h) => `<li><button data-hist="${esc(h.id)}"><span class="r-title">${esc(h.title)}</span><span class="r-sub">${ago(h.date)}${h.total ? ` · ${Math.round(100 * h.right / h.total)}%` : ""}</span></button></li>`).join("")
+    $("#recentList").innerHTML = hist.length ? hist.map((h) => `<li><button data-hist="${esc(h.id)}"><span class="r-title">${esc(h.title)}</span><span class="r-sub">${ago(h.date)}${h.total ? `, ${Math.round(100 * h.right / h.total)}%` : ""}</span></button></li>`).join("")
       : `<li class="empty">${f ? "No matches." : "Your quizzes will appear here."}</li>`;
   }
   function renderHistory() {
     const hist = store.get("history", []);
     $("#view-history").innerHTML = `<div class="rev-head"><h2>History</h2>${hist.length ? `<button class="btn ghost sm" data-act="clear">${ico("trash")}Clear</button>` : ""}</div>` +
       (hist.length ? `<div class="hist-list">${hist.map((h) => `<div class="hist-item glass"><span class="hi-icon">${ico(h.source === "docs" ? "file" : "globe")}</span>
-        <div class="hi-main"><div class="hi-title">${esc(h.title)}</div><div class="hi-sub">${ago(h.date)} · ${h.count} questions · ${esc(h.difficulty)} · ${esc(h.mode)}</div></div>
+        <div class="hi-main"><div class="hi-title">${esc(h.title)}</div><div class="hi-sub">${ago(h.date)}, ${h.count} questions, ${esc(h.difficulty.toLowerCase())}, ${esc(h.mode.toLowerCase())}</div></div>
         <div class="hi-score">${h.total ? Math.round(100 * h.right / h.total) + "%" : "—"}</div>
         <button class="btn sm" data-hist="${esc(h.id)}">${ico("replay")}Retake</button></div>`).join("")}</div>`
         : `<div class="empty-state">${ico("clock")}<p>No quizzes yet. Pick a topic on the home screen to start.</p></div>`);

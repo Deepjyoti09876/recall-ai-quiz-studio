@@ -1,6 +1,20 @@
 {
   "version": "0.2.0",
   "configurations": [
-    { "name": "Run Recall website", "type": "debugpy", "request": "launch", "module": "recall.server", "console": "integratedTerminal", "env": { "FLASK_DEBUG": "1" } }
+    {
+      "name": "Run Recall website",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "recall.server",
+      "console": "integratedTerminal",
+      "env": {
+        "FLASK_DEBUG": "1"
+      },
+      "serverReadyAction": {
+        "pattern": "http://localhost:(\\d+)",
+        "uriFormat": "http://localhost:%s",
+        "action": "openExternally"
+      }
+    }
   ]
 }

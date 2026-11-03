@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import time
 import urllib.request
 import urllib.error
 from dotenv import load_dotenv
@@ -9,7 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_FALLBACK_MODEL = "llama-3.3-70b-versatile"
 LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3.2:3b")
 
 DIFFICULTY_GUIDE = {
@@ -186,27 +188,121 @@ def generate_topic_quiz(topic, difficulty="Medium", n_mcq=5, n_short=3, n_code=0
         material, sources = found["material"], found["sources"]
 
     use_groq = _use_groq(engine)
-    max_chars = 30_000 if use_groq else 10_000
+    max_chars = 9_000 if use_groq else 10_000
     prompt = build_topic_prompt(topic, material, difficulty, n_mcq, n_short, n_code, language, max_chars)
     quiz = _run_prompt(prompt, use_groq, system=TOPIC_SYSTEM)
     return {"quiz": quiz, "sources": sources, "web_used": bool(material)}
 
 
+def _describe_groq_error(e: Exception) -> str:
+    """Turn a Groq failure into one plain sentence."""
+    code = getattr(e, "code", None)
+    if code in (401, 403):
+        return ("Groq refused the request (HTTP %s). Your network, VPN or WARP may be blocked by Groq, "
+                "or the API key is invalid. Try another network, turn the VPN off, or check GROQ_API_KEY." % code)
+    if code == 429:
+        return "Groq rate limit reached. Wait a minute and try again."
+    if code in (400, 404):
+        return f"Groq rejected the model or request (HTTP {code}). Check GROQ_MODEL in .env."
+    if isinstance(e, (urllib.error.URLError, TimeoutError, OSError)):
+        return "Could not reach Groq. Check your internet connection."
+    return f"Groq error: {e}"
+
+
+_BAD_MODELS: set[str] = set()
+
+
+_MODEL_CACHE: dict = {"t": 0.0, "ids": []}
+_SKIP_WORDS = ("whisper", "orpheus", "guard", "safeguard", "tts", "embed", "distil-whisper")
+_PREFERRED = ("openai/gpt-oss-120b", "qwen/", "openai/gpt-oss-20b", "llama-3.3", "llama-3.1")
+
+
+def _groq_models() -> list[str]:
+    """Return the list of Groq models that are currently available to this key."""
+    now = time.time()
+    if not _MODEL_CACHE["ids"] or now - _MODEL_CACHE["t"] > 600:
+        try:
+            key = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
+            req = urllib.request.Request("https://api.groq.com/openai/v1/models",
+                                         headers={"Authorization": f"Bearer {key}", "User-Agent": "RecallQuiz/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                ids = [m["id"] for m in json.loads(r.read().decode("utf-8")).get("data", [])]
+            ids = [i for i in ids if not any(w in i for w in _SKIP_WORDS)]
+            if ids:
+                _MODEL_CACHE.update(t=now, ids=ids)
+        except Exception:
+            pass
+    rank = lambda i: next((n for n, p in enumerate(_PREFERRED) if i.startswith(p)), len(_PREFERRED))
+    ordered = sorted(_MODEL_CACHE["ids"], key=lambda i: (rank(i), i))
+    return [m for m in dict.fromkeys([GROQ_MODEL] + ordered) if m not in _BAD_MODELS]
+
+
+def _groq_retry(prompt: str, model: str, system: str = None) -> str:
+    """Call Groq, retrying brief network hiccups (dropped connection, timeout, 5xx)."""
+    last = None
+    for attempt in range(3):
+        try:
+            return _call_groq_llm(prompt, model=model, system=system)
+        except urllib.error.HTTPError as e:
+            if e.code < 500:
+                raise
+            last = e
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+            last = e
+        time.sleep(1.5 * (attempt + 1))
+    raise last
+
+
 def _run_prompt(prompt: str, use_groq: bool, system: str = None) -> dict:
-    last_err = None
+    """Try Groq with a fallback to local Ollama and return the best valid quiz."""
+    problems = []
+    if use_groq:
+        models = _groq_models()
+        for round_no in range(4):
+            limited, wait = False, 0
+            for m in models:
+                try:
+                    validated = _validate(_parse(_groq_retry(prompt, m, system)))
+                    if any(validated.values()):
+                        return validated
+                    problems.append("Groq returned no usable questions.")
+                except Exception as e:
+                    code = getattr(e, "code", None)
+                    if code in (400, 404):
+                        if code == 404:
+                            _BAD_MODELS.add(m)
+                        continue
+                    if code == 429:
+                        limited = True
+                        try:
+                            wait = max(wait, min(max(float(e.headers.get("retry-after", 12)), 12), 25))
+                        except Exception:
+                            wait = max(wait, 12)
+                        continue
+                    msg = _describe_groq_error(e)
+                    if msg not in problems:
+                        problems.append(msg)
+                    if code in (401, 403):
+                        limited = False
+                        break
+            if not limited:
+                break
+            if round_no < 3:
+                time.sleep(wait or 12)
+            else:
+                problems.append("Groq rate limit reached on every model. Wait a minute and try again.")
     for attempt in range(2):
         try:
-            raw_json = (_call_groq_llm(prompt, system=system) if use_groq
-                        else _call_local_llm(prompt, system=system))
-            validated = _validate(_parse(raw_json))
+            validated = _validate(_parse(_call_local_llm(prompt, system=system)))
             if any(validated.values()):
                 return validated
-            last_err = ValueError("Model returned no usable questions")
+            problems.append("Ollama returned no usable questions.")
         except Exception as e:
-            last_err = e
-            if use_groq and attempt == 0:   # Groq failed -> try local Ollama
-                use_groq = False
-    raise RuntimeError(f"Could not generate the quiz: {last_err}")
+            first = str(e).split(" Details:")[0]
+            problems.append(first)
+            if "Ensure Ollama is running" in first:
+                break
+    raise RuntimeError("Could not generate the quiz. " + " ".join(dict.fromkeys(problems)))
 
 
 def generate_quiz(text, difficulty="Medium", n_mcq=5, n_short=3, n_code=2,
@@ -217,7 +313,7 @@ def generate_quiz(text, difficulty="Medium", n_mcq=5, n_short=3, n_code=2,
     api_key = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
     use_groq = (engine == "groq") or (engine == "auto" and bool(api_key and api_key.startswith("gsk_")))
 
-    max_chars = 30_000 if use_groq else 10_000
+    max_chars = 9_000 if use_groq else 10_000
     prompt = build_prompt(text, difficulty, n_mcq, n_short, n_code, language, max_chars=max_chars)
 
     return _run_prompt(prompt, use_groq)
