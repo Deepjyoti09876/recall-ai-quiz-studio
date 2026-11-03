@@ -1,0 +1,93 @@
+\chapter{System Architecture}
+
+\section{Introduction}
+Recall follows a classic client--server design. A framework-free single-page application runs in the browser and talks to a small stateless Flask server over a JSON API. The server orchestrates three back-end concerns: research and ingestion of source text, communication with an LLM engine, and execution of coding answers. No database is used; the only persistent state is the learner's history, which the browser keeps in \texttt{localStorage}.
+
+\section{Architectural Pattern Selection}
+A \textbf{layered, stateless web architecture} was chosen for the following reasons:
+\begin{itemize}
+\item \textbf{Statelessness.} Every request carries everything the server needs (topic, settings or files). The server therefore needs no sessions, no database and no clean-up, and a restart loses nothing.
+\item \textbf{Separation of concerns.} The HTTP layer (\texttt{server.py}) only validates input and shapes responses; domain logic lives in \texttt{quiz\_engine.py}, \texttt{research.py}, \texttt{file\_loader.py} and \texttt{sandbox.py}.
+\item \textbf{Pluggable engines.} Cloud and local models sit behind the same prompt-and-parse pipeline, so adding another provider means writing one function.
+\end{itemize}
+
+\section{System Architecture Vector Diagram}
+Figure~\ref{fig:arch} shows the major components and the direction of data flow.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=2.9cm, minimum height=0.9cm, align=center, font=\small, fill=gray!8},
+    ext/.style={draw, dashed, rounded corners, minimum width=2.9cm, minimum height=0.9cm, align=center, font=\small},
+    arr/.style={-{Stealth[length=2.2mm]}, thick}
+]
+\node[box, fill=blue!8]  (ui)  at (0,0)       {Browser SPA\\ \scriptsize app.js / index.html};
+\node[box, fill=green!8] (api) at (4.4,0)     {Flask API\\ \scriptsize server.py};
+\node[box]               (fl)  at (8.8,0)     {File loader\\ \scriptsize file\_loader.py};
+\node[box]               (sb)  at (13.2,0)    {Code sandbox\\ \scriptsize sandbox.py};
+\node[ext]               (ls)  at (0,-2.4)    {localStorage\\ \scriptsize history, settings};
+\node[box]               (eng) at (4.4,-2.4)  {Quiz engine\\ \scriptsize quiz\_engine.py};
+\node[box]               (res) at (8.8,-2.4)  {Web research\\ \scriptsize research.py};
+\node[ext]               (web) at (13.2,-2.4) {Wikipedia\\ DuckDuckGo, Tavily};
+\node[ext]               (groq) at (2.4,-4.8) {Groq Cloud API};
+\node[ext]               (oll)  at (6.4,-4.8) {Ollama (local)};
+
+\draw[arr] (ui) -- node[above, font=\scriptsize]{JSON} (api);
+\draw[arr, dashed] (ui) -- (ls);
+\draw[arr] (api) -- (eng);
+\draw[arr] (api) -- (fl);
+\draw[arr] (api.north) -- ++(0,0.7) -| (sb.north);
+\draw[arr] (eng) -- (res);
+\draw[arr] (res) -- (web);
+\draw[arr] (eng.south west) -- (groq.north);
+\draw[arr] (eng.south east) -- (oll.north);
+\end{tikzpicture}
+\caption{High-level system architecture of Recall}
+\label{fig:arch}
+\end{figure}
+
+\section{Data Flow Diagram (DFD) Hierarchy}
+\subsection{Level 0 -- context}
+The learner supplies a topic or files and settings; the system returns a structured quiz, feedback on answers and exportable results. External entities are the LLM provider (Groq or Ollama) and the web sources used for research.
+
+\subsection{Level 1 -- main processes}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    proc/.style={draw, rounded corners, minimum width=5.2cm, minimum height=0.8cm, align=center, font=\small, fill=gray!8},
+    arr/.style={-{Stealth[length=2.2mm]}, thick}
+]
+\node[proc] (a) {1. Validate and clamp settings};
+\node[proc, below=of a] (b) {2. Gather source text\\\ \scriptsize topic: research / documents: extract text};
+\node[proc, below=of b] (c) {3. Build prompt (schema + difficulty guidance)};
+\node[proc, below=of c] (d) {4. Call engine (Groq, else Ollama)};
+\node[proc, below=of d] (e) {5. Parse and validate JSON};
+\node[proc, below=of e] (f) {6. Return quiz + sources to browser};
+\foreach \s/\t in {a/b,b/c,c/d,d/e,e/f} \draw[arr] (\s) -- (\t);
+\draw[arr] (e.east) -- ++(1.4,0) |- node[pos=0.25, right, font=\scriptsize, align=left]{invalid / empty:\\retry, then\\fall back} (d.east);
+\end{tikzpicture}
+\caption{Level-1 data flow for quiz generation}
+\label{fig:dfd1}
+\end{figure}
+
+\section{Explicit Technology Stack Justification}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{3.2cm} p{3.4cm} X @{}}
+\toprule
+\textbf{Layer} & \textbf{Technology} & \textbf{Justification} \\
+\midrule
+Web server & Flask (Python) & Minimal, easy to read, ideal for a small JSON API and static hosting. \\
+Front end & HTML, CSS, vanilla JavaScript & No build step; the whole UI is three static files served by Flask. \\
+Cloud LLM & Groq chat-completions API & Very low latency; supports JSON-object response mode. \\
+Local LLM & Ollama (default \texttt{llama3.2:3b}) & Works offline and without an API key. \\
+Research & Wikipedia API, DuckDuckGo instant answer, Tavily & Free, no key needed except Tavily (optional). \\
+Documents & pypdf, python-docx, python-pptx & Pure-Python text extraction for the supported formats. \\
+Configuration & python-dotenv & Keeps keys out of source code. \\
+Legacy UI & Streamlit & The earlier prototype is kept in \texttt{legacy\_streamlit/}. \\
+\bottomrule
+\end{tabularx}
+\caption{Technology stack}
+\label{tab:stack}
+\end{table}

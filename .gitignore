@@ -1,0 +1,20 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.zip
+*.bak
+# LaTeX build output
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.synctex.gz
+
+# LaTeX build artifacts
+report/*.pdf
+report/*.fls
+report/*.fdb_latexmk
+report/*.lof
+report/*.lot
+report/*.synctex*

@@ -1,0 +1,350 @@
+\documentclass[12pt, a4paper]{report}
+
+% ======================================================================
+% PREAMBLE: PACKAGES & SETTINGS (same format as the reference report)
+% ======================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{a4paper, left=1.9cm, right=1.9cm, top=2.5cm, bottom=1.9cm, headheight=15pt, headsep=0.6cm, includefoot}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{tabularx}
+\usepackage{eso-pic}
+\usepackage[expansion=false,protrusion=false]{microtype}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{seqsplit}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usetikzlibrary{calc, shapes.geometric, arrows.meta, positioning, fit, backgrounds, decorations.pathreplacing}
+\pgfplotsset{compat=1.18}
+
+\onehalfspacing
+
+\tolerance=10000
+\hbadness=10000
+\emergencystretch=3em
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,
+    urlcolor=blue,
+    pdftitle={Project Report - Recall AI Quiz Studio},
+}
+
+% ---------- code listing styles ----------
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=false,
+    postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+}
+\lstdefinelanguage{JSON}{
+    basicstyle=\ttfamily\footnotesize,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5},
+    rulecolor=\color{gray!40},
+}
+\lstdefinestyle{pseudo}{
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\bfseries\color{blue},
+    commentstyle=\itshape\color{green!50!black},
+    stringstyle=\color{orange},
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5},
+    rulecolor=\color{gray!40},
+}
+
+% ---------- page border on every page ----------
+\AddToShipoutPictureBG{%
+\begin{tikzpicture}[overlay,remember picture]
+\draw[line width=1.5pt]
+    ($(current page.north west) + (0.7cm,-0.7cm)$)
+    rectangle
+    ($(current page.south east) + (-0.7cm,0.7cm)$);
+\end{tikzpicture}
+}
+
+% ======================================================================
+% PLACEHOLDERS - edit these once, they are used on every front page
+% ======================================================================
+\newcommand{\ProjectTitle}{Recall: AI Quiz Studio}
+\newcommand{\GuideName}{[Guide Name]}
+\newcommand{\GuideDesignation}{[Guide Designation]}
+\newcommand{\SubmissionMonth}{[Month Year]}
+\newcommand{\SubmissionDate}{[DD/MM/YYYY]}
+\newcommand{\MemberOne}{[Student Name 1]}   \newcommand{\RollOne}{[Roll No. 1]}
+\newcommand{\MemberTwo}{[Student Name 2]}   \newcommand{\RollTwo}{[Roll No. 2]}
+\newcommand{\MemberThree}{[Student Name 3]} \newcommand{\RollThree}{[Roll No. 3]}
+\newcommand{\MemberFour}{[Student Name 4]}  \newcommand{\RollFour}{[Roll No. 4]}
+
+% ---------- screenshot slot ----------
+% \screenshot[width]{file-name-without-extension}{caption}{label}{what to capture}
+% If report/images/screenshots/<file>.png (or .jpg) exists it is shown,
+% otherwise a dashed placeholder box describing what to capture is drawn.
+\newcommand{\screenshot}[5][0.85]{%
+\begin{figure}[H]
+\centering
+\IfFileExists{images/screenshots/#2.png}{%
+    \includegraphics[width=#1\textwidth,height=0.36\textheight,keepaspectratio]{images/screenshots/#2.png}}{%
+\IfFileExists{images/screenshots/#2.jpg}{%
+    \includegraphics[width=#1\textwidth,height=0.36\textheight,keepaspectratio]{images/screenshots/#2.jpg}}{%
+    \begin{tikzpicture}
+    \node[draw=gray, dashed, thick, minimum width=#1\textwidth, minimum height=4.6cm,
+          align=center, text width=#1\textwidth-1cm, fill=gray!6, font=\small]
+          {\textbf{[ SCREENSHOT PLACEHOLDER ]}\\[2pt] \texttt{images/screenshots/\detokenize{#2}.png}\\[4pt] \textit{#5}};
+    \end{tikzpicture}}}
+\caption{#3}
+\label{#4}
+\end{figure}
+}
+
+\begin{document}
+\sloppy
+
+% ======================================================================
+% TITLE PAGE
+% ======================================================================
+\begin{titlepage}
+\centering
+\vspace*{0.2cm}
+{\Large \textbf{A PROJECT REPORT}}\\[0.3cm]
+{\large \textbf{on}}\\[0.3cm]
+{\LARGE \textbf{``\ProjectTitle''}}\\[0.5cm]
+{\large Submitted to}\\[0.1cm]
+{\large \textbf{KIIT Deemed to be University}}\\[0.4cm]
+{\large In Partial Fulfilment of the Requirement for the Award of}\\[0.2cm]
+{\Large \textbf{BACHELOR'S DEGREE IN}}\\[0.1cm]
+{\Large \textbf{COMPUTER SCIENCE AND ENGINEERING}}\\[0.5cm]
+{\large \textbf{BY}}\\[0.3cm]
+{\large
+\begin{center}
+\begin{tabular}{@{} l @{\hspace{2cm}} l @{}}
+\textbf{\MemberOne}   & \textbf{\RollOne} \\
+\textbf{\MemberTwo}   & \textbf{\RollTwo} \\
+\textbf{\MemberThree} & \textbf{\RollThree} \\
+\textbf{\MemberFour}  & \textbf{\RollFour} \\
+\end{tabular}
+\end{center}
+}
+\vspace{0.3cm}
+\vfill
+{\large \textbf{UNDER THE GUIDANCE OF}}\\[0.2cm]
+{\large \textbf{\GuideName}}\\[0.4cm]
+\includegraphics[width=0.25\textwidth]{images/KIIT_logo.png}\\[0.4cm]
+{\large \textbf{SCHOOL OF COMPUTER ENGINEERING}}\\[0.1cm]
+{\large \textbf{KALINGA INSTITUTE OF INDUSTRIAL TECHNOLOGY}}\\[0.1cm]
+{\large \textbf{BHUBANESWAR, ODISHA - 751024}}\\[0.3cm]
+{\large \textbf{\SubmissionMonth}}
+\end{titlepage}
+
+\pagenumbering{roman}
+\setcounter{page}{2}
+
+% ======================================================================
+% CERTIFICATE
+% ======================================================================
+\phantomsection
+\addcontentsline{toc}{chapter}{Certificate}
+\begin{center}
+{\Large \textbf{KIIT Deemed to be University}}\\[0.2cm]
+{\large \textbf{School of Computer Engineering}}\\[0.2cm]
+{\large \textbf{Bhubaneswar, ODISHA 751024}}\\[0.8cm]
+\includegraphics[width=0.20\textwidth]{images/KIIT_logo.png}\\[0.8cm]
+{\LARGE \textbf{CERTIFICATE}}\\[1cm]
+\end{center}
+
+This is to certify that the project report entitled \textbf{``\ProjectTitle''} is a bona fide record of work carried out by \textbf{\MemberOne}, \textbf{\MemberTwo}, \textbf{\MemberThree}, and \textbf{\MemberFour} under my supervision and guidance, in partial fulfilment of the requirements for the award of the Degree of Bachelor's in Computer Science and Engineering from KIIT Deemed to be University, Bhubaneswar.
+
+\vfill
+\noindent
+\begin{minipage}[t]{0.45\textwidth}
+\vspace{2cm}
+\textbf{Date:} \SubmissionDate
+\end{minipage}\hfill
+\begin{minipage}[t]{0.5\textwidth}
+\raggedleft
+\textbf{Signature of Guide}\\[1cm]
+\textbf{\GuideName}\\[0.2cm]
+\GuideDesignation\\
+School of Computer Engineering\\
+KIIT Deemed to be University
+\end{minipage}
+\vspace*{1cm}
+
+% ======================================================================
+% DECLARATION
+% ======================================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Declaration}
+\begin{center}
+{\LARGE \textbf{DECLARATION}}\\[1cm]
+\end{center}
+
+We hereby declare that the project report entitled \textbf{``\ProjectTitle''} submitted to KIIT Deemed to be University, Bhubaneswar, in partial fulfilment of the requirements for the award of the Degree of Bachelor's in Computer Science and Engineering, is a record of original work carried out by us.
+
+\vfill
+\noindent
+\begin{minipage}[b]{0.4\textwidth}
+\textbf{Place:} Bhubaneswar\\[0.3cm]
+\textbf{Date:} \SubmissionDate
+\end{minipage}\hfill
+\begin{minipage}[b]{0.6\textwidth}
+\raggedleft
+\textbf{\MemberOne} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
+\textbf{\MemberTwo} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
+\textbf{\MemberThree} (\dots\dots\dots\dots\dots\dots)\\[0.2cm]
+\textbf{\MemberFour} (\dots\dots\dots\dots\dots\dots)
+\end{minipage}
+\vspace*{1cm}
+
+% ======================================================================
+% ACKNOWLEDGEMENT
+% ======================================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Acknowledgement}
+\begin{center}
+{\LARGE \textbf{ACKNOWLEDGEMENT}}\\[1cm]
+\end{center}
+
+We would like to express our profound gratitude to our project guide, \textbf{\GuideName}, for their valuable guidance, continuous encouragement, and invaluable support throughout the development of this project.
+
+\par\vspace{0.5cm}
+We also extend our sincere thanks to the Head of the Department, School of Computer Engineering, KIIT Deemed to be University, for providing us with the necessary facilities and a conducive environment to carry out this work.
+
+\vfill
+\begin{flushright}
+\textbf{\MemberOne\ (\RollOne)}\\[0.15cm]
+\textbf{\MemberTwo\ (\RollTwo)}\\[0.15cm]
+\textbf{\MemberThree\ (\RollThree)}\\[0.15cm]
+\textbf{\MemberFour\ (\RollFour)}
+\end{flushright}
+\vspace*{1cm}
+
+% ======================================================================
+% ABSTRACT
+% ======================================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Abstract}
+\begin{center}
+{\LARGE \textbf{ABSTRACT}}\\[1cm]
+\end{center}
+
+Preparing practice questions is slow, and most self-study tools either ship a fixed question bank or ask the learner to write every question by hand. This project presents \textbf{Recall}, a locally hosted web application that turns \textit{any topic} or \textit{any uploaded study material} into a complete quiz within seconds. A learner can type a topic such as ``Dijkstra's algorithm'', or upload PDF, DOCX, PPTX, TXT and Markdown files, choose Easy, Medium or Hard difficulty, and receive a mix of multiple-choice, written-answer and coding questions.
+
+\par\vspace{0.5cm}
+The system is built as a Flask JSON API with a framework-free HTML, CSS and JavaScript single-page front end. For topic quizzes, a research module gathers source text in parallel from Wikipedia, DuckDuckGo and, optionally, the Tavily search API, so that questions are grounded in real sources that are listed on the results page. Question generation is delegated to a large language model through a pluggable engine layer: the Groq cloud API is used when an API key is configured, and a local Ollama model acts as an offline fallback. Every model reply is parsed and validated against a strict JSON schema, and a retry-with-fallback loop protects the user from malformed output. Written answers are graded by the language model against a model answer and a list of key points, and coding answers are executed against test cases in a time-limited subprocess sandbox. The interface offers a Practice mode with instant feedback and a timed Exam mode with a question grid and review flags, a retry-mistakes loop, history and statistics stored in the browser, and JSON and Markdown export.
+
+\par\vspace{0.5cm}
+This report documents the requirements, architecture, API design, AI generation pipeline, research and ingestion modules, code sandbox, front end, security considerations, testing and future scope of the system.
+
+\par\vspace{0.5cm}
+\noindent\textbf{Keywords:} Quiz Generation, Large Language Model, Prompt Engineering, Retrieval of Web Sources, Automated Grading, Document Processing, Flask, Groq, Ollama, Single-Page Application.
+
+% ======================================================================
+% PROJECT CONTRIBUTORS
+% ======================================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Project Contributors}
+\begin{center}
+{\LARGE \textbf{PROJECT CONTRIBUTORS}}\\[0.8cm]
+\end{center}
+
+\noindent \textbf{1. Technical Implementation \& Engineering Contributions} \\
+The primary technical responsibilities of each member are outlined below.
+\begin{itemize}
+\item \setlength{\itemsep}{0pt}\textbf{\MemberOne:} [Describe technical contribution, e.g.\ backend API and AI engine integration.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberTwo:} [Describe technical contribution, e.g.\ front-end single-page application.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberThree:} [Describe technical contribution, e.g.\ web research and document ingestion.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberFour:} [Describe technical contribution, e.g.\ code sandbox, testing and deployment.]
+\end{itemize}
+\vspace*{0.3cm}
+\noindent \textbf{2. Individual Contribution to Project Report Preparation} \\
+Documentation responsibilities were partitioned to match each member's technical domain.
+\begin{itemize}
+\item \setlength{\itemsep}{0pt}\textbf{\MemberOne:} [Chapters authored.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberTwo:} [Chapters authored.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberThree:} [Chapters authored.]
+\item \setlength{\itemsep}{0pt}\textbf{\MemberFour:} [Chapters authored.]
+\end{itemize}
+
+% ======================================================================
+% CONTENTS, FIGURES, TABLES, ABBREVIATIONS
+% ======================================================================
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\newpage
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{center}
+{\LARGE \textbf{LIST OF ABBREVIATIONS}}\\[1cm]
+\end{center}
+\begin{tabularx}{\textwidth}{@{} p{3cm} X @{}}
+\toprule
+\textbf{Abbreviation} & \textbf{Full Form} \\
+\midrule
+AI & Artificial Intelligence \\
+API & Application Programming Interface \\
+CSS & Cascading Style Sheets \\
+DFD & Data Flow Diagram \\
+DOCX / PPTX & Microsoft Word / PowerPoint Open XML formats \\
+HTML & HyperText Markup Language \\
+HTTP & HyperText Transfer Protocol \\
+IEEE & Institute of Electrical and Electronics Engineers \\
+JSON & JavaScript Object Notation \\
+LLM & Large Language Model \\
+MCQ & Multiple-Choice Question \\
+PDF & Portable Document Format \\
+REST & Representational State Transfer \\
+SPA & Single-Page Application \\
+SRS & Software Requirements Specification \\
+UI / UX & User Interface / User Experience \\
+WSGI & Web Server Gateway Interface \\
+\bottomrule
+\end{tabularx}
+
+% ======================================================================
+% MAIN MATTER
+% ======================================================================
+\newpage
+\pagenumbering{arabic}
+
+\input{chapters/ch01_introduction}
+\input{chapters/ch02_literature_review}
+\input{chapters/ch03_requirements}
+\input{chapters/ch04_architecture}
+\input{chapters/ch05_backend_api}
+\input{chapters/ch06_ai_engine}
+\input{chapters/ch07_research_ingestion}
+\input{chapters/ch08_code_sandbox}
+\input{chapters/ch09_frontend}
+\input{chapters/ch10_security_testing_deployment}
+\input{chapters/ch11_standards}
+\input{chapters/ch12_conclusion}
+
+\appendix
+\input{chapters/appendix_a_directory}
+\input{chapters/appendix_b_prompts}
+
+\end{document}

@@ -1,0 +1,43 @@
+\chapter{Introduction}
+
+\section{Overview and Background}
+Active recall, the practice of retrieving information from memory instead of simply re-reading it, is one of the most effective study techniques available to students. Quizzes are its most natural form. In practice, however, learners rarely have a quiz that matches exactly what they are studying: published question banks are generic, and writing good questions manually, with plausible wrong options, model answers and test cases, takes longer than studying the material itself.
+
+Recent large language models (LLMs) can read a passage and produce well-formed questions about it. The remaining engineering problem is to make this reliable and useful: the model must be given trustworthy source material, its output must be forced into a machine-readable structure, the answers must be graded, and the whole experience must feel like a quiz and not a chat window.
+
+\textbf{Recall} is a web application that addresses this problem. A learner either types a topic or uploads study material, chooses a difficulty and a question mix, and receives a ready-to-take quiz containing multiple-choice, written and coding questions. The application runs on the learner's own machine, so uploaded notes never have to be stored on a third-party server other than the model provider that is explicitly selected.
+
+\section{Problem Statement}
+Students preparing for examinations face the following recurring difficulties:
+\begin{itemize}
+\item Ready-made question banks do not cover the learner's own notes, slides or syllabus.
+\item Writing questions, distractors, model answers and test cases manually is time-consuming.
+\item Asking a general chat assistant for ``a quiz'' produces free-form text that cannot be taken, scored, timed or reviewed inside an application.
+\item Questions invented by a model without source material may contain factual errors, and the learner has no way to see where a question came from.
+\item Written and coding answers need feedback, which most static quiz tools cannot give.
+\end{itemize}
+There is therefore a need for a single tool that generates \textit{grounded}, \textit{structured} and \textit{gradable} quizzes from arbitrary topics and documents.
+
+\section{Objectives of the System}
+The objectives of the project are:
+\begin{enumerate}
+\item To generate quizzes on any user-typed topic, grounded in web sources whose names and links are shown to the learner.
+\item To generate quizzes from uploaded PDF, DOCX, PPTX, TXT and Markdown files and from pasted text.
+\item To support three question types (multiple choice, written answer and coding) at Easy, Medium and Hard difficulty.
+\item To enforce a strict JSON schema on model output and to recover automatically from malformed or empty replies.
+\item To provide two engines, a fast cloud engine (Groq) and an offline local engine (Ollama), with automatic fallback.
+\item To grade written answers with AI feedback and to execute coding answers against test cases.
+\item To provide Practice mode (instant feedback) and Exam mode (timer, question grid, flag for review), together with history, statistics and export.
+\end{enumerate}
+
+\section{Scope and Limitations}
+\textbf{Scope.} The system covers quiz generation, taking, grading, reviewing and exporting for a single learner using a modern desktop or mobile browser. It includes the Flask back end, the research and document-ingestion modules, the code sandbox and the single-page front end.
+
+\textbf{Limitations.}
+\begin{itemize}
+\item The system depends on the quality of the selected language model; the small local model gives noticeably weaker questions than the cloud model.
+\item Quiz history is stored only in the browser's local storage; there are no user accounts and no cross-device synchronisation.
+\item The code runner executes Python only, and it runs submitted code in a plain subprocess on the host machine. It is intended for local, single-user use and is not a hardened multi-tenant sandbox.
+\item Scanned PDFs without a text layer cannot be read, because no optical character recognition is performed.
+\item The project does not currently include an automated test suite; testing was performed manually (Chapter~\ref{chap:security}).
+\end{itemize}

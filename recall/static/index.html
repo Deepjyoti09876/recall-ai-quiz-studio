@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recall · AI Quiz Studio</title>
+  <meta name="description" content="Turn any topic or document into a quiz in seconds.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23c4b5fd'/%3E%3Cstop offset='1' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='%2314102e'/%3E%3Cpath d='M16 5l2.6 7.4L26 15l-7.4 2.6L16 25l-2.6-7.4L6 15l7.4-2.6z' fill='url(%23g)'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<div class="shell" id="shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar glass" id="sidebar">
+    <a class="brand" href="#/" data-nav="home">
+      <span class="brand-mark"><i data-i="spark"></i></span>
+      <span>Recall</span>
+    </a>
+
+    <nav class="nav">
+      <a href="#/" data-nav="home" class="active"><i data-i="home"></i>Home</a>
+      <a href="#/" data-nav="topic"><i data-i="globe"></i>Topic quiz</a>
+      <a href="#/" data-nav="docs"><i data-i="file"></i>From documents</a>
+      <a href="#/history" data-nav="history"><i data-i="clock"></i>History</a>
+      <a href="#/" data-nav="settings"><i data-i="gear"></i>Settings</a>
+    </nav>
+
+    <div class="side-section">
+      <div class="side-head">
+        <span>Recent quizzes</span>
+        <button class="icon-btn sm" data-nav="topic" title="New quiz" aria-label="New quiz"><i data-i="plus"></i></button>
+      </div>
+      <ul class="recent" id="recentList"></ul>
+    </div>
+
+    <a class="view-all" href="#/history" data-nav="history">View all quizzes <i data-i="arrowRight"></i></a>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn burger" id="burger" aria-label="Menu"><i data-i="menu"></i></button>
+      <label class="search glass-soft">
+        <i data-i="search"></i>
+        <input id="searchInput" type="search" placeholder="Search your quizzes" autocomplete="off">
+        <kbd>⌘K</kbd>
+      </label>
+      <div class="top-actions">
+        <button class="btn-pill" data-nav="topic"><i data-i="plus"></i><span>New quiz</span></button>
+        <button class="avatar" id="avatarBtn" title="Settings" aria-label="Settings"><span id="avatarInitial">D</span></button>
+      </div>
+    </header>
+
+    <div class="demo-banner" id="demoBanner" hidden>
+      <i data-i="info"></i>
+      <span><b>Demo mode.</b> The AI server isn't connected, so quizzes come from a built-in sample. Run <code>python -m recall.server</code> locally for real topic &amp; document quizzes.</span>
+    </div>
+
+    <!-- ---------- HOME VIEW ---------- -->
+    <section class="view" id="view-home">
+      <h1 class="hero">What do you want<br>to master today?</h1>
+
+      <div class="composer glass" id="composer">
+        <div class="composer-tabs" role="tablist">
+          <button role="tab" class="ctab active" data-source="topic"><i data-i="globe"></i>Any topic</button>
+          <button role="tab" class="ctab" data-source="docs"><i data-i="file"></i>My documents</button>
+          <span class="ctab-ink" aria-hidden="true"></span>
+        </div>
+
+        <!-- topic input -->
+        <div class="pane" data-pane="topic">
+          <textarea id="topicInput" rows="2" maxlength="300" placeholder="Type any topic… e.g. “Dijkstra's algorithm”, “TCP vs UDP”, “French Revolution”"></textarea>
+          <div class="web-row">
+            <label class="switch"><input type="checkbox" id="webToggle" checked><span class="track"><span class="thumb"></span></span></label>
+            <span><b>Research the web</b> <span class="muted">— Wikipedia, DuckDuckGo<span id="tavilyTag"></span></span></span>
+            <select id="depthSelect" class="mini-select" title="Research depth">
+              <option value="quick">Quick</option>
+              <option value="standard" selected>Standard</option>
+              <option value="deep">Deep</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- docs input -->
+        <div class="pane" data-pane="docs" hidden>
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload files">
+            <i data-i="upload"></i>
+            <div><b>Drop files here</b> or <u>browse</u><br><span class="muted">PDF · DOCX · PPTX · TXT · MD</span></div>
+            <input type="file" id="fileInput" multiple accept=".pdf,.docx,.pptx,.txt,.md" hidden>
+          </div>
+          <div class="file-chips" id="fileChips"></div>
+          <textarea id="pasteInput" rows="3" placeholder="…or paste your notes here"></textarea>
+        </div>
+
+        <div class="composer-foot">
+          <button class="icon-btn" id="attachBtn" title="Attach files" aria-label="Attach files"><i data-i="clip"></i></button>
+          <div class="seg" data-setting="difficulty">
+            <button data-v="Easy">Easy</button><button data-v="Medium" class="on">Medium</button><button data-v="Hard">Hard</button>
+          </div>
+          <div class="seg" data-setting="mode">
+            <button data-v="Practice" class="on" title="Instant feedback after each answer">Practice</button><button data-v="Exam" title="Timed, feedback at the end">Exam</button>
+          </div>
+          <button class="chip-btn" id="mixBtn" aria-expanded="false"><i data-i="sliders"></i><span id="mixLabel">5 MCQ · 2 written</span></button>
+          <button class="go-btn" id="generateBtn" title="Generate quiz (Ctrl+Enter)" aria-label="Generate quiz">
+            <i data-i="wave"></i>
+          </button>
+        </div>
+
+        <!-- Mix popover -->
+        <div class="popover glass" id="mixPop" hidden>
+          <div class="pop-title">Question mix</div>
+          <div class="stepper-row"><span><i data-i="list"></i>Multiple choice</span><div class="stepper" data-k="n_mcq" data-min="0" data-max="20"></div></div>
+          <div class="stepper-row"><span><i data-i="pen"></i>Written answers</span><div class="stepper" data-k="n_short" data-min="0" data-max="10"></div></div>
+          <div class="stepper-row"><span><i data-i="code"></i>Coding</span><div class="stepper" data-k="n_code" data-min="0" data-max="5"></div></div>
+          <div class="pop-grid">
+            <label>Language
+              <select id="langSelect" class="mini-select">
+                <option>Python</option><option>Java</option><option>C</option><option>C++</option><option>JavaScript</option>
+              </select>
+            </label>
+            <label>Exam time
+              <select id="timerSelect" class="mini-select">
+                <option value="5">5 min</option><option value="10">10 min</option><option value="15" selected>15 min</option>
+                <option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">60 min</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn primary full" id="mixDone">Done</button>
+        </div>
+      </div>
+
+      <div class="suggest" id="suggest">
+        <span class="muted">Try:</span>
+      </div>
+
+      <div class="cards">
+        <button class="card glass" data-preset="topic">
+          <h3>Quiz any<br>topic</h3><p>Researched from the web</p><i data-i="globe"></i>
+        </button>
+        <button class="card glass" data-preset="docs">
+          <h3>Quiz my<br>notes</h3><p>PDF, Word, slides…</p><i data-i="file"></i>
+        </button>
+        <button class="card glass" data-preset="exam">
+          <h3>Exam<br>mode</h3><p>Timed, no hints</p><i data-i="timer"></i>
+        </button>
+        <button class="card glass" data-preset="code">
+          <h3>Code<br>practice</h3><p>Run real tests</p><i data-i="code"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- ---------- LOADING VIEW ---------- -->
+    <section class="view" id="view-loading" hidden>
+      <div class="loader-wrap">
+        <div class="orb-loader"><span></span><span></span><span></span><b></b></div>
+        <h2 id="loadTitle">Building your quiz…</h2>
+        <ol class="load-steps" id="loadSteps"></ol>
+        <button class="btn ghost" id="cancelLoad">Cancel</button>
+      </div>
+    </section>
+
+    <!-- ---------- QUIZ VIEW ---------- -->
+    <section class="view" id="view-quiz" hidden>
+      <div class="quiz-head">
+        <button class="btn ghost sm" id="exitQuiz"><i data-i="x"></i>Exit</button>
+        <div class="quiz-title">
+          <div class="eyebrow" id="quizMeta"></div>
+          <div class="quiz-name" id="quizName"></div>
+        </div>
+        <div class="timer" id="timer" hidden><i data-i="timer"></i><span>15:00</span></div>
+      </div>
+      <div class="progress"><span id="progressBar"></span></div>
+      <div class="qgrid" id="qgrid"></div>
+
+      <article class="qcard glass" id="qcard"></article>
+
+      <div class="quiz-nav">
+        <button class="btn ghost" id="prevBtn"><i data-i="arrowLeft"></i>Previous</button>
+        <button class="btn ghost" id="flagBtn" hidden><i data-i="flag"></i><span>Flag</span></button>
+        <button class="btn primary" id="nextBtn">Next<i data-i="arrowRight"></i></button>
+      </div>
+      <p class="hint muted"><kbd>1</kbd>–<kbd>4</kbd> pick an option · <kbd>←</kbd><kbd>→</kbd> move · <kbd>Enter</kbd> next</p>
+    </section>
+
+    <!-- ---------- RESULTS VIEW ---------- -->
+    <section class="view" id="view-results" hidden></section>
+
+    <!-- ---------- REVIEW VIEW ---------- -->
+    <section class="view" id="view-review" hidden></section>
+
+    <!-- ---------- HISTORY VIEW ---------- -->
+    <section class="view" id="view-history" hidden></section>
+  </main>
+
+  <!-- ============ RIGHT RAIL ============ -->
+  <aside class="rail">
+    <div class="panel glass engine-card">
+      <div class="engine-name"><span id="engineName">AI Engine</span> <i data-i="spark" class="tiny-spark"></i></div>
+      <p class="muted" id="engineDesc">Generates, grades and explains your questions.</p>
+      <div class="crystal" aria-hidden="true">
+        <span class="slab s1"></span><span class="slab s2"></span><span class="slab s3"></span><span class="slab s4"></span>
+        <span class="sphere"></span>
+      </div>
+      <select id="engineSelect" class="mini-select full" aria-label="AI engine"></select>
+    </div>
+
+    <div class="panel glass">
+      <div class="panel-title">Capabilities</div>
+      <ul class="caps" id="caps">
+        <li><i data-i="globe"></i>Web research<span class="ok" data-cap="web_research"><i data-i="check"></i></span></li>
+        <li><i data-i="file"></i>Document reading<span class="ok" data-cap="documents"><i data-i="check"></i></span></li>
+        <li><i data-i="pen"></i>AI answer grading<span class="ok" data-cap="ai_grading"><i data-i="check"></i></span></li>
+        <li><i data-i="code"></i>Code runner<span class="ok" data-cap="code_runner"><i data-i="check"></i></span></li>
+      </ul>
+    </div>
+
+    <div class="panel glass">
+      <div class="panel-title">Your activity</div>
+      <dl class="stats">
+        <div><dt>Quizzes taken</dt><dd id="statQuizzes">0</dd></div>
+        <div><dt>Questions answered</dt><dd id="statQs">0</dd></div>
+        <div><dt>Average score</dt><dd id="statAvg">—</dd></div>
+      </dl>
+      <svg class="spark" id="sparkline" viewBox="0 0 260 56" preserveAspectRatio="none" aria-label="Recent scores"></svg>
+    </div>
+
+    <div class="panel glass tip">
+      <span class="tip-icon"><i data-i="spark"></i></span>
+      <div><b>Pro tip</b><span class="muted">Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to generate instantly.</span></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Settings dialog -->
+<dialog class="modal glass" id="settingsModal">
+  <form method="dialog">
+    <h2>Settings</h2>
+    <label class="field">Your name<input id="nameInput" maxlength="30" placeholder="Deepjyoti"></label>
+    <label class="field">Default AI engine<select id="engineSelect2" class="mini-select full"></select></label>
+    <label class="field">Server address <span class="muted">(leave empty when running locally)</span><input id="apiInput" placeholder="http://localhost:8000"></label>
+    <div class="modal-actions">
+      <button class="btn ghost" value="clear" id="clearHistory" type="button">Clear history</button>
+      <button class="btn primary" value="save" id="saveSettings">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal glass" id="confirmModal">
+  <h2 id="confirmText">Are you sure?</h2>
+  <div class="modal-actions">
+    <button class="btn ghost" id="confirmNo" type="button">Cancel</button>
+    <button class="btn primary" id="confirmYes" type="button">Continue</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="static/app.js"></script>
+</body>
+</html>

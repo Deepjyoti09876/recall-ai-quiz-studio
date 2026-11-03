@@ -1,0 +1,78 @@
+\chapter{Web Research and Document Ingestion}
+
+\section{Purpose}
+Both quiz types need \textit{source material}. For topic quizzes it is gathered from the web by \texttt{recall/research.py}; for document quizzes it is extracted from uploaded files by \texttt{recall/file\_loader.py}. Supplying real text to the model is what allows questions to be grounded and attributed.
+
+\section{Web Research Pipeline}
+\subsection{Sources}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{2.6cm} p{3cm} X @{}}
+\toprule
+\textbf{Source} & \textbf{Availability} & \textbf{What is retrieved} \\
+\midrule
+Tavily & Only if \texttt{TAVILY\_API\_KEY} is set & Advanced web search; content snippets of the top results. \\
+Wikipedia & Always, no key & Search for the topic, then plain-text extracts of the top articles (references and external-link sections removed). \\
+DuckDuckGo & Always, no key & Instant-answer abstract and a few related-topic lines. \\
+\bottomrule
+\end{tabularx}
+\caption{Research sources}
+\label{tab:sources}
+\end{table}
+
+\subsection{Depth levels}
+The learner chooses a research depth that controls how many Wikipedia pages are fetched and how much text is kept per page.
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{2.5cm} p{3.2cm} X @{}}
+\toprule
+\textbf{Depth} & \textbf{Wikipedia pages} & \textbf{Characters per page} \\
+\midrule
+Quick & 1 & 7{,}000 \\
+Standard (default) & 3 & 7{,}000 \\
+Deep & 5 & 9{,}000 \\
+\bottomrule
+\end{tabularx}
+\caption{Research depth}
+\label{tab:depth}
+\end{table}
+
+\subsection{Concurrent retrieval and fault tolerance}
+The three sources are queried in parallel with a thread pool of three workers and a 12-second time-out each. A failure in any single source (network blocked, time-out, malformed JSON) is caught, recorded in an \texttt{errors} list and ignored; the remaining sources are still used. Results are de-duplicated by URL and concatenated into one block of the form \texttt{\#\#\# SOURCE n: title (site)} followed by its text, capped at 30{,}000 characters. The list of titles and links is returned separately and displayed on the results page.
+
+\begin{lstlisting}[style=pseudo, caption={Simplified logic of the research function}, label={lst:research}]
+research(topic, depth):
+    pages <- {quick: 1, standard: 3, deep: 5}[depth]
+    run in parallel: tavily(topic), wikipedia(topic, pages), duckduckgo(topic)
+    for each source: on error -> record error, use empty list
+    docs <- merge results in order tavily, wikipedia, duckduckgo
+    drop duplicate URLs
+    material <- "### SOURCE i: title (site)" + text for each doc, cut at 30000 chars
+    return material, sources, errors
+\end{lstlisting}
+
+\subsection{Offline behaviour}
+If every source fails, the material is empty and the engine is told to rely on its own reliable knowledge. The response sets \texttt{web\_used=false} and the interface shows a notice so the learner knows the questions are not source-backed.
+
+\screenshot{topic_sources}{Results page of a topic quiz listing the web sources used to ground the questions}{fig:sources}{Finish a topic quiz with ``Research the web'' enabled and capture the Sources list on the results page.}
+
+\section{Document Ingestion}
+\texttt{extract\_text(name, bytes)} dispatches on the file extension.
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{2cm} p{3.2cm} X @{}}
+\toprule
+\textbf{Format} & \textbf{Library} & \textbf{Extraction rule} \\
+\midrule
+PDF & pypdf & Text of every page, joined by newlines. \\
+DOCX & python-docx & Text of every paragraph. \\
+PPTX & python-pptx & Text frames of all shapes on every slide. \\
+TXT, MD & built-in & Decoded as UTF-8, ignoring invalid bytes. \\
+\bottomrule
+\end{tabularx}
+\caption{Supported document formats}
+\label{tab:formats}
+\end{table}
+Text from several files and any pasted text is combined. If the combined text contains fewer than 80 characters, generation is refused with a clear message; this protects against empty or scanned (image-only) documents.
+
+\screenshot{docs_upload}{Document tab of the composer with the drag-and-drop zone, file chips and paste area}{fig:docs-upload}{Switch to ``My documents'' on the home page, add one PDF or slide deck and capture the composer.}

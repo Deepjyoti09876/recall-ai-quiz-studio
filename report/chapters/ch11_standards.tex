@@ -1,0 +1,24 @@
+\chapter{Standards Adopted}
+
+\section{Design Standards}
+\begin{itemize}
+\item \textbf{IEEE Std 830 / ISO/IEC/IEEE 29148} -- structure of the requirements specification in Chapter~3.
+\item \textbf{REST conventions} -- resource-style paths under \texttt{/api}, use of HTTP methods and JSON bodies, and meaningful status codes (200, 400, 413, 502).
+\item \textbf{JSON (RFC 8259)} -- the only data-interchange format between browser, server and model.
+\item \textbf{Responsive and accessible web design} -- semantic HTML, ARIA labels and live regions, native dialogs.
+\end{itemize}
+
+\section{Coding Standards}
+\begin{itemize}
+\item \textbf{PEP 8} naming and layout for Python modules, with type hints and docstrings in the sandbox and research modules.
+\item Single-responsibility modules inside the \texttt{recall} package, with relative imports.
+\item Configuration through environment variables (twelve-factor style); no secrets in source.
+\item Defensive error handling at system boundaries: network calls have time-outs and failures degrade gracefully.
+\end{itemize}
+
+\section{Testing Standards}
+\begin{itemize}
+\item Black-box functional testing of every endpoint, including negative cases (invalid input, unsupported files, time-outs) as recorded in Table~\ref{tab:tests}.
+\item Each test case states the input, the expected result and the observed result.
+\item Recommended next step: convert the executed cases into an automated \texttt{pytest} suite using Flask's test client, with the LLM call mocked.
+\end{itemize}

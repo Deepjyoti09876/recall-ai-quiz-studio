@@ -1,0 +1,41 @@
+\chapter{Frontend Engineering \& User Experience}
+
+\section{Introduction}
+The front end is a single-page application written in plain HTML, CSS and JavaScript (\texttt{recall/static/index.html}, \texttt{styles.css}, \texttt{app.js}) with no build step and no framework. It uses a ``glass'' visual style on a deep-violet background and is organised as a sidebar, a main work area and a right-hand information rail.
+
+\section{Views and Navigation}
+The main area switches between six views: \textbf{Home} (the composer), \textbf{Loading}, \textbf{Quiz}, \textbf{Results}, \textbf{Review} and \textbf{History}. The sidebar offers navigation, a list of recent quizzes with search, and settings. The right rail shows the active AI engine with an engine selector, the server capabilities reported by \texttt{/api/status}, and the learner's activity statistics with a score sparkline.
+
+\screenshot{home}{Home view: composer with topic input, difficulty, mode and question-mix controls, and the capability rail}{fig:home}{Open http://localhost:8000 and capture the whole home page.}
+
+\section{The Composer}
+The composer offers two input tabs. \textbf{Any topic} accepts up to 300 characters, a ``Research the web'' switch and a depth selector. \textbf{My documents} provides a drag-and-drop zone, file chips and a paste area. Segmented controls choose difficulty (Easy, Medium, Hard) and mode (Practice or Exam); a popover with steppers sets the number of MCQ, written and coding questions, the coding language and the exam time. \texttt{Ctrl+Enter} generates the quiz.
+
+\screenshot{question_mix}{The question-mix popover with steppers for multiple-choice, written and coding questions, language and exam time}{fig:mix}{Click the mix chip (e.g.\ ``5 MCQ - 2 written'') and capture the open popover.}
+
+\section{Taking a Quiz}
+\subsection{Practice mode}
+After the learner picks an option the correct answer, explanation and, if available, the source quote are revealed immediately. Written answers can be graded on demand with the \textit{Check with AI} button (or compared with the model answer), and coding answers can be run against test cases with \textit{Run tests}; a \textit{Show solution} button reveals the reference solution.
+
+\subsection{Exam mode}
+Exam mode shows a countdown timer, a question grid for jumping between questions, and a flag button to mark questions for review. Feedback is withheld until the quiz is submitted. Keyboard shortcuts are available: keys \texttt{1}--\texttt{4} choose an option, the arrow keys move between questions and \texttt{Enter} advances.
+
+\screenshot{quiz_practice}{Practice-mode question card with immediate feedback, explanation and source quote}{fig:practice}{Take a quiz in Practice mode, answer one MCQ and capture the card with the green/red feedback and explanation.}
+\screenshot{quiz_exam}{Exam mode with countdown timer, question grid and flag-for-review control}{fig:exam}{Start a quiz in Exam mode and capture the top of the quiz view showing the timer and question grid.}
+
+\section{Results, Review and the Retry Loop}
+On submission the results page shows a score ring with a short verdict, tiles for the percentage score, multiple-choice questions correct, the number of written and coding questions, and the time taken, plus a row of coloured dots showing the status of each question. Action buttons let the learner retry only the mistakes (retry loop), review the mistakes or all questions, retake the quiz, download it as JSON or Markdown, or start a new quiz. For topic quizzes a ``Sources used'' panel lists the web pages the questions were based on. If some questions are left unanswered, a confirmation dialog appears before submission.
+
+\screenshot{results}{Results page with score summary, retry and review actions, export buttons and the list of sources used}{fig:results}{Submit a finished quiz and capture the results page.}
+\screenshot{review}{Review of incorrect answers with the correct option and explanation}{fig:review}{On the results page choose the review of mistakes and capture it.}
+
+\section{State, History and Statistics}
+All persistent state is stored with the prefix \texttt{recall.} in the browser's \texttt{localStorage}: the learner's name, default engine, optional server address and the list of past quizzes with scores. Reads and writes are wrapped in \texttt{try/catch}, so the application still works when storage is unavailable. The sidebar and the activity panel derive recent quizzes, number of quizzes taken, questions answered and average score from this history; the history view allows searching, re-taking and clearing.
+
+\screenshot{history}{History view listing earlier quizzes with scores, with the activity statistics panel}{fig:history}{After taking two or three quizzes open History from the sidebar and capture it.}
+
+\section{Demo Mode}
+On start-up the page calls \texttt{/api/status}. If the server cannot be reached, a banner announces \textit{Demo mode} and a small built-in sample quiz is used, so the interface can still be shown, for example when the static files are hosted without the Flask back end. In demo mode live research, document upload and code execution are unavailable.
+
+\section{Responsive and Accessible Design}
+The layout collapses for narrow screens with a menu button for the sidebar. Interactive elements carry ARIA labels, the toast notifications use a polite live region and dialogs use the native \texttt{<dialog>} element for settings and confirmations.

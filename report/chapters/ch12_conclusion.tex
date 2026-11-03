@@ -1,0 +1,46 @@
+\chapter{Conclusion \& Future Scope}
+
+\section{Comprehensive Project Summary}
+Recall demonstrates that a small, dependency-light application can turn arbitrary topics and study documents into complete, gradable quizzes. Source text is retrieved from the web or extracted from files, wrapped in a schema-constrained prompt, sent to a cloud or local language model, parsed, validated and delivered through an exam-style interface with AI grading and a code runner. The key engineering ideas are: grounding questions in visible sources, never trusting raw model output, always providing a fallback path, and keeping the server stateless.
+
+\section{Current System Limitations}
+\begin{itemize}
+\item Only Python code can be executed, and the runner is not isolated from the host.
+\item No user accounts; history is local to one browser.
+\item No optical character recognition for scanned documents.
+\item Question quality depends on the chosen model and, for topic quizzes, on the quality of retrieved sources.
+\item No automated test suite yet.
+\item The default cloud model name in code differs from the one in \texttt{.env.example}; the \texttt{.env} value takes precedence.
+\end{itemize}
+
+\section{Objectives Traceability Matrix}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{1.3cm} X p{3.6cm} @{}}
+\toprule
+\textbf{Obj.} & \textbf{Objective (Section 1.3)} & \textbf{Where realised} \\
+\midrule
+1 & Topic quizzes grounded in web sources & Ch.~7, \texttt{research.py} \\
+2 & Quizzes from uploaded documents and pasted text & Ch.~7, \texttt{file\_loader.py} \\
+3 & Three question types and three difficulties & Ch.~5, Ch.~6 \\
+4 & Strict JSON schema, validation and retry & Ch.~6, \texttt{quiz\_engine.py} \\
+5 & Cloud engine with offline local fallback & Ch.~6 \\
+6 & AI grading and code execution & Ch.~6, Ch.~8 \\
+7 & Practice and Exam modes, history, export & Ch.~9 \\
+\bottomrule
+\end{tabularx}
+\caption{Objectives traceability matrix}
+\label{tab:trace}
+\end{table}
+
+\section{Future Architectural Enhancements}
+\begin{itemize}
+\item \textbf{Containerised sandbox} supporting Java, C, C++ and JavaScript with resource limits.
+\item \textbf{Automated tests} with \texttt{pytest}, mocked engines and continuous integration.
+\item \textbf{Accounts and cloud sync} for history, with spaced-repetition scheduling of missed questions.
+\item \textbf{Vector retrieval} (embeddings) for long documents, instead of truncating to the first 30{,}000 characters.
+\item \textbf{OCR} for scanned PDFs and images of handwritten notes.
+\item \textbf{Question quality checks}, such as a second model pass that verifies each answer against its source quote.
+\item \textbf{Teacher mode} for sharing a generated quiz through a link and collecting results.
+\item \textbf{Streaming generation} so that questions appear as soon as they are produced.
+\end{itemize}

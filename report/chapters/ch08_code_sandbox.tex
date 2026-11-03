@@ -1,0 +1,34 @@
+\chapter{Code Execution Sandbox}
+
+\section{Purpose and Design}
+Coding questions are only useful if the learner can check an answer. \texttt{recall/sandbox.py} provides this by running submitted code against the test cases that accompany each coding question. Each test case consists of a stdin string and the expected stdout.
+
+\section{Execution Model}
+For every test case the module performs the following steps:
+\begin{enumerate}
+\item The code is written to a temporary \texttt{.py} file.
+\item It is executed with the same Python interpreter as the server (\texttt{sys.executable}) in a subprocess, with the test input piped to stdin and the environment variable \texttt{PYTHONIOENCODING=utf-8}.
+\item Standard output and standard error are captured and truncated to 10{,}000 characters each.
+\item The subprocess is limited to a 5-second time-out; on expiry it is terminated and the case is reported as timed out.
+\item The temporary file is always removed in a \texttt{finally} block.
+\end{enumerate}
+
+\section{Result Evaluation}
+A test case passes only if the process did not time out, exited with return code~0 and its trimmed stdout equals the trimmed expected output. For each case the endpoint returns the input, the expected and actual output, a pass flag and an error message (a time-out notice or the last error text from stderr). The response also carries the totals \texttt{passed}, \texttt{failed} and \texttt{total}.
+
+\begin{lstlisting}[style=pseudo, caption={Evaluation of one test case}, label={lst:tc}]
+result <- run_code(code, stdin = test.input, timeout = 5s)
+actual <- strip(result.stdout)
+passed <- (not result.timed_out) and result.returncode == 0
+          and actual == strip(test.expected_output)
+\end{lstlisting}
+
+\section{Language Support and Limitations}
+The user interface lets the learner request coding questions in Python, Java, C, C++ or JavaScript, but \textbf{only Python can currently be executed}; for any other language the runner returns the message ``Only Python execution is supported currently''. The runner is a convenience for local practice and has the following security limits, which are discussed further in Chapter~\ref{chap:security}:
+\begin{itemize}
+\item the code runs with the same privileges as the server, without file-system or network isolation;
+\item only wall-clock time and output size are limited, not memory or CPU.
+\end{itemize}
+It must therefore never be exposed to untrusted users on a public network.
+
+\screenshot{coding_question}{A coding question with starter code editor and test-case results after pressing Run}{fig:coding}{Generate a quiz with one Python coding question, type or paste a solution, press Run and capture the editor plus the passed/failed test list.}

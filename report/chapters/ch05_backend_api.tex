@@ -1,0 +1,76 @@
+\chapter{Backend Development \& API Design}
+
+\section{Introduction to the API Ecosystem}
+The back end is a single Flask application (\texttt{recall/server.py}) that serves the static front end at \texttt{/} and exposes six JSON endpoints under \texttt{/api}. The server is started with \texttt{python -m recall.server}, binds to \texttt{127.0.0.1} and reads the port from the \texttt{PORT} environment variable (default 8000). Uploads are limited to 40~MB through Flask's \texttt{MAX\_CONTENT\_LENGTH}, and an error handler returns a readable JSON message for HTTP 413.
+
+\section{Settings Validation and Error Handling}
+All quiz settings arriving from the browser are passed through one function, \texttt{\_settings()}, which clamps numbers to safe ranges and replaces unknown values with defaults. This centralisation means no endpoint can request, for example, 500 questions or an unsupported difficulty.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{3cm} p{3.6cm} X @{}}
+\toprule
+\textbf{Setting} & \textbf{Allowed values} & \textbf{Default / behaviour} \\
+\midrule
+\texttt{difficulty} & Easy, Medium, Hard & Medium \\
+\texttt{n\_mcq} & 0--20 & 5 \\
+\texttt{n\_short} & 0--10 & 2 \\
+\texttt{n\_code} & 0--5 & 0 \\
+\texttt{language} & Python, Java, C, C++, JavaScript & Python \\
+\texttt{engine} & auto, groq, ollama & auto \\
+Total questions & at least 1 & otherwise a \texttt{ValueError} is raised \\
+\bottomrule
+\end{tabularx}
+\caption{Clamped quiz settings}
+\label{tab:settings}
+\end{table}
+
+Errors follow a uniform contract: a \texttt{ValueError} (bad user input) becomes HTTP~400 with \texttt{\{"error": "..."\}}, and any other exception (engine failure, network error) becomes HTTP~502.
+
+\section{API Endpoint Reference}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{1.6cm} p{4.6cm} X @{}}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Purpose and body} \\
+\midrule
+GET  & \texttt{/api/status} & Lists available engines and capabilities (web research, Tavily, documents, code runner, AI grading). \\
+POST & \texttt{/api/quiz/topic} & JSON: \texttt{topic, use\_web, depth, difficulty, n\_mcq, n\_short, n\_code, language, engine}. Returns \texttt{quiz, sources, web\_used}. \\
+POST & \texttt{/api/quiz/document} & Multipart: \texttt{files[]}, \texttt{text}, \texttt{settings} (JSON string). Returns \texttt{quiz, files, chars}. \\
+POST & \texttt{/api/grade} & JSON: \texttt{answer, model\_answer, key\_points}. Returns \texttt{score, hits, misses, feedback}. \\
+POST & \texttt{/api/run} & JSON: \texttt{code, test\_cases, language}. Returns pass/fail counts and per-case results. \\
+POST & \texttt{/api/export/markdown} & JSON: \texttt{quiz, difficulty}. Returns the quiz as Markdown text. \\
+\bottomrule
+\end{tabularx}
+\caption{API endpoints}
+\label{tab:endpoints}
+\end{table}
+
+\section{Data Dictionary \& Contract Payload Specifications}
+\subsection{Quiz object}
+A quiz is an object with three arrays, any of which may be empty.
+\begin{lstlisting}[language=JSON, caption={Quiz payload returned by the generation endpoints}, label={lst:quiz-json}]
+{
+  "mcq":    [{ "question": "...", "options": ["A","B","C","D"],
+               "answer_index": 2, "explanation": "...",
+               "source_quote": "..." }],
+  "short":  [{ "question": "...", "model_answer": "...",
+               "key_points": ["...", "..."] }],
+  "coding": [{ "question": "...", "language": "Python",
+               "starter_code": "...", "solution": "...",
+               "test_cases": [{ "input": "3\n", "expected_output": "6" }],
+               "explanation": "..." }]
+}
+\end{lstlisting}
+
+\subsection{Grading result}
+\begin{lstlisting}[language=JSON, caption={Response of the grading endpoint}, label={lst:grade-json}]
+{ "score": 70, "hits": ["defined the term"],
+  "misses": ["did not mention complexity"],
+  "feedback": "Good start; add the time complexity." }
+\end{lstlisting}
+
+\section{Document Quiz Endpoint Flow}
+For \texttt{/api/quiz/document} the server reads the settings, collects pasted text, rejects any file whose extension is not in the allowed set (\texttt{pdf, docx, pptx, txt, md}), extracts text from each file, joins everything and calls the quiz engine. The response also reports the file names and total character count so the interface can confirm what was read.
+
+\screenshot{api_status}{Response of the \texttt{/api/status} endpoint shown in the browser, listing the available engines and capabilities}{fig:api-status}{Open http://localhost:8000/api/status in the browser and capture the JSON.}

@@ -1,0 +1,56 @@
+﻿\chapter{Security, Testing \& Deployment}
+\label{chap:security}
+
+\section{Security Measures and Data Privacy}
+\begin{itemize}
+\item \textbf{Secrets.} API keys are read from environment variables loaded from a local \texttt{.env} file. The file is listed in \texttt{.gitignore} and a template, \texttt{.env.example}, with empty placeholders is committed instead.
+\item \textbf{Network exposure.} The development server binds to \texttt{127.0.0.1} only, so it is not reachable from other machines.
+\item \textbf{Input validation.} Quiz settings are clamped in one function; topic length is limited to 300 characters; the upload extension is checked against a whitelist; total upload size is limited to 40~MB.
+\item \textbf{Data minimisation.} The server stores nothing. Quiz history remains in the learner's browser. Only the text needed for generation (topic, extracted material, answers to be graded) is sent to the selected model provider; choosing the Ollama engine keeps this entirely on the local machine.
+\item \textbf{Output handling.} Model output is parsed as JSON and filtered through a schema validator before it reaches the interface.
+\end{itemize}
+
+\textbf{Known risks.} The code runner executes learner-submitted Python with the server's privileges and offers no isolation from the file system or network (Section~\ref{sec:future-hardening}). The application has no authentication, so it must not be exposed on a public address. These are acceptable for the intended single-user local scenario and are listed as future work.
+
+\section{System Testing}
+No automated test suite exists yet. The system was therefore verified by manual black-box testing of the API with \texttt{curl} against a running instance, plus interactive testing of the interface. Table~\ref{tab:tests} records the executed API test cases and their observed results.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{@{} p{0.9cm} p{4.6cm} p{4.4cm} X @{}}
+\toprule
+\textbf{ID} & \textbf{Test case} & \textbf{Expected} & \textbf{Observed} \\
+\midrule
+T1 & GET \texttt{/api/status} & HTTP 200, engines and capabilities & Pass: 200, two engines listed \\
+T2 & Topic quiz with empty topic & HTTP 400, message asking for a topic & Pass \\
+T3 & Topic quiz with 0 MCQ, 0 written, 0 coding & HTTP 400, ``Choose at least one question.'' & Pass \\
+T4 & Run correct doubling program on 2 cases & 2 passed, 0 failed & Pass \\
+T5 & Run program printing wrong output & 1 failed with actual and expected shown & Pass \\
+T6 & Run infinite loop & Terminated; ``timed out after 5 seconds'' & Pass (about 5.0~s) \\
+T7 & Upload a file named \texttt{bad.exe} & HTTP 400, unsupported file type & Pass \\
+T8 & Document quiz with fewer than 80 characters & HTTP 400, not enough text & Pass \\
+T9 & Grade an empty answer & HTTP 400, ``Write an answer first.'' & Pass \\
+T10 & Export a one-question quiz to Markdown & Numbered question, lettered options, answer line & Pass \\
+T11 & Topic quiz ``Binary search'', quick depth, Easy, 2 MCQ + 1 written, auto engine & HTTP 200 with valid questions & Pass: valid MCQs returned from the cloud engine \\
+\bottomrule
+\end{tabularx}
+\caption{Executed API test cases}
+\label{tab:tests}
+\end{table}
+
+\section{Deployment}
+\subsection{Local deployment}
+\begin{enumerate}
+\item Create a virtual environment and install \texttt{requirements.txt}.
+\item Copy \texttt{.env.example} to \texttt{.env} and set \texttt{GROQ\_API\_KEY} (optional \texttt{TAVILY\_API\_KEY}); for offline use install Ollama and run \texttt{ollama pull llama3.2:3b}.
+\item Start the server with \texttt{python -m recall.server} (or \texttt{scripts/run.bat} on Windows) and open \texttt{http://localhost:8000}.
+\end{enumerate}
+
+\subsection{Source control}
+The project is published as a public Git repository containing the source, front end, scripts and this report's LaTeX sources, while the environment file, virtual environment and caches are excluded.
+
+\section{Planned Hardening}
+\label{sec:future-hardening}
+Before any shared or public deployment the code runner should execute inside a container or restricted process with no network, memory and CPU limits and a read-only file system, a production WSGI server should replace the Flask development server, and authentication and rate limiting should be added in front of the model endpoints.
+

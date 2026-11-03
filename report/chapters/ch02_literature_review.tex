@@ -1,0 +1,40 @@
+\chapter{Literature Review}
+
+\section{Introduction}
+This chapter surveys the categories of tools and techniques that Recall builds on: existing quiz and flash-card platforms, automatic question generation, grounding language models with retrieved text, automated grading of free-text answers, and automatic assessment of programming exercises. The discussion is deliberately descriptive; formal citations should be added to the bibliography by the authors from the sources they consulted.
+
+\section{Existing Quiz and Study Platforms}
+Flash-card and quiz platforms such as Quizlet, Kahoot and Google Forms quizzes let a teacher or learner author question sets and then deliver them with scoring, timers and sharing. Their strength is polished delivery; their weakness is that \textit{every question must be written by a human}. Learning-management systems offer large question banks, but these are tied to a specific course and rarely match a learner's own notes.
+
+\section{Automatic Question Generation}
+Automatic question generation (AQG) has been studied for many years, first with rule-based and template-based systems that transform sentences into questions, and later with neural sequence-to-sequence models. Template approaches produce grammatical but shallow questions. Modern instruction-tuned LLMs can write multi-sentence stems, plausible distractors and explanations in a single pass, and can be asked to adjust cognitive level. Recall uses this capability and expresses the target level through a per-difficulty guidance string (recall of facts for Easy, application for Medium, multi-step analysis for Hard).
+
+\section{Grounding Language Models with Retrieved Text}
+A known weakness of LLMs is \textit{hallucination}: fluent statements that are not true. A widely used mitigation is to retrieve relevant text first and instruct the model to answer only from it. Recall applies this idea in two ways. For document quizzes the uploaded text is the grounding material. For topic quizzes, a research module retrieves plain-text extracts from Wikipedia, a DuckDuckGo abstract and, optionally, Tavily search results, then asks the model to quote the supporting passage for each multiple-choice question in a \texttt{source\_quote} field.
+
+\section{Automated Grading of Written Answers}
+Grading free-text answers has historically relied on keyword matching or similarity scores against a reference answer. LLMs allow a rubric-style approach: the model is given the reference answer and a list of key points and returns a score, the points the student covered, the points missed and short feedback. Recall follows this rubric approach and falls back to a neutral ``could not grade automatically'' result if the model is unreachable, so the interface never blocks.
+
+\section{Automated Assessment of Programming Exercises}
+Online judges and programming-education tools evaluate code by running it against hidden test cases and comparing standard output with the expected output. Recall adopts the same model in a small local form: each coding question carries test cases with stdin input and expected stdout, and the learner's code is executed under a time limit.
+
+\section{Summary of Research Gaps}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{3.6cm} X X @{}}
+\toprule
+\textbf{Capability} & \textbf{Typical existing tools} & \textbf{Recall} \\
+\midrule
+Question source & Written by a human or fixed bank & Generated from any topic or document \\
+Source transparency & Not applicable & Sources listed; \texttt{source\_quote} per MCQ \\
+Written-answer feedback & Manual or none & AI grading against key points \\
+Coding questions & Separate judge platforms & Built-in test-case runner \\
+Offline use & Rarely & Local Ollama fallback \\
+Study analytics & Account-based & Browser-local history and stats \\
+\bottomrule
+\end{tabularx}
+\caption{Comparison of existing approaches with the proposed system}
+\label{tab:gap}
+\end{table}
+
+The gap addressed by this project is the absence of a single, locally runnable tool that combines grounded generation, strict structure, mixed question types, grading and exam-style delivery.

@@ -1,0 +1,48 @@
+\chapter{Prompts and Schema}
+\label{app:prompts}
+
+\section{JSON schema given to the model}
+\begin{lstlisting}[language=JSON, caption={Schema embedded in every generation prompt}, label={lst:schema}]
+{
+  "mcq": [{"question": str, "options": [str, str, str, str],
+           "answer_index": 0-3, "explanation": str, "source_quote": str}],
+  "short": [{"question": str, "model_answer": str, "key_points": [str]}],
+  "coding": [{"question": str, "language": str, "starter_code": str,
+              "solution": str,
+              "test_cases": [{"input": str, "expected_output": str}],
+              "explanation": str}]
+}
+\end{lstlisting}
+
+\section{Difficulty guidance}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{2cm} X @{}}
+\toprule
+\textbf{Level} & \textbf{Guidance placed in the prompt} \\
+\midrule
+Easy & Recall and definitions; direct facts from the text; obvious distractors. Coding: simple one-concept tasks (loops, conditionals, basic functions). \\
+Medium & Understanding and application; small scenarios; plausible distractors. Coding: moderate logic, standard data structures, small algorithms. \\
+Hard & Analysis and problem solving; multi-step reasoning, edge cases, subtle distractors. Coding: optimisation, complexity analysis, tricky edge cases. \\
+\bottomrule
+\end{tabularx}
+\caption{Difficulty guidance strings}
+\label{tab:difficulty}
+\end{table}
+
+\section{System prompts}
+\begin{lstlisting}[style=pseudo, caption={Document-quiz system prompt (abridged)}, label={lst:sys-doc}]
+You are an expert university examiner for B.Tech Computer Science.
+Create quiz questions ONLY from the provided material. For each MCQ,
+ensure distractors are plausible and include a source_quote (exact
+short excerpt justifying the answer). Respond with a single valid JSON
+object and nothing else (no markdown fences).
+\end{lstlisting}
+
+\begin{lstlisting}[style=pseudo, caption={Topic-quiz system prompt (abridged)}, label={lst:sys-topic}]
+You are an expert university examiner and subject tutor. Create
+accurate, well-balanced quiz questions about the requested topic. When
+web research material is provided, base questions on it and quote it in
+source_quote; otherwise use well-established, uncontroversial knowledge.
+Never invent facts. Respond with a single valid JSON object only.
+\end{lstlisting}

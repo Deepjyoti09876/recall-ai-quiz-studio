@@ -1,0 +1,34 @@
+\chapter{Project Directory Structure}
+The following listing shows the top-level file organisation of the source repository.
+
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize, caption={Repository directory tree}, label={lst:dir-tree}]
+recall-ai-quiz-studio/
+|-- README.md
+|-- requirements.txt
+|-- .env.example
+|-- .gitignore
+|-- recall/
+|   |-- __init__.py
+|   |-- server.py          Flask app and JSON API
+|   |-- quiz_engine.py     prompts, LLM calls, validation, grading
+|   |-- research.py        Wikipedia / DuckDuckGo / Tavily research
+|   |-- file_loader.py     PDF / DOCX / PPTX / TXT / MD extraction
+|   |-- sandbox.py         Python code runner with test cases
+|   `-- static/
+|       |-- index.html
+|       |-- styles.css
+|       `-- app.js
+|-- legacy_streamlit/
+|   |-- app.py
+|   |-- theme.py
+|   `-- .streamlit/config.toml
+|-- scripts/
+|   |-- run.bat
+|   `-- run.sh
+`-- report/
+    |-- main.tex
+    |-- chapters/
+    `-- images/
+        |-- KIIT_logo.png
+        `-- screenshots/
+\end{lstlisting}

@@ -1,0 +1,65 @@
+\chapter{System Requirements Specification (SRS)}
+
+\section{Introduction and Purpose}
+This chapter specifies the functional and non-functional requirements of Recall following the structure recommended by IEEE Std 830/29148. The purpose of the system is to generate, deliver, grade and review quizzes built from a topic or from learner-supplied documents.
+
+\section{Target Audience \& User Roles}
+Recall is a single-user application and has no authentication. Two usage roles are distinguished for clarity.
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{3cm} X @{}}
+\toprule
+\textbf{Role} & \textbf{Description} \\
+\midrule
+Learner & Types a topic or uploads notes, selects settings, takes the quiz, reads feedback, reviews mistakes and exports results. \\
+Operator (setup) & Installs the application, supplies the optional \texttt{GROQ\_API\_KEY} and \texttt{TAVILY\_API\_KEY} in the \texttt{.env} file and chooses the port. In practice the learner and operator are the same person. \\
+\bottomrule
+\end{tabularx}
+\caption{User roles}
+\label{tab:roles}
+\end{table}
+
+\section{Functional Requirements}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{1.3cm} X @{}}
+\toprule
+\textbf{ID} & \textbf{Requirement} \\
+\midrule
+FR-1 & The system shall generate a quiz from a free-text topic of 2 to 300 characters. \\
+FR-2 & The system shall optionally research the topic on the web (depth: quick, standard or deep) and list the sources used. \\
+FR-3 & The system shall generate a quiz from uploaded PDF, DOCX, PPTX, TXT or MD files and/or pasted text (minimum 80 characters of extracted text). \\
+FR-4 & The system shall let the user choose difficulty (Easy, Medium, Hard) and the number of MCQ (0--20), written (0--10) and coding (0--5) questions, with at least one question in total. \\
+FR-5 & The system shall validate model output and discard malformed questions; it shall retry and fall back to the local engine when generation fails. \\
+FR-6 & The system shall support Practice mode (instant feedback) and Exam mode (timer, question grid, flag for review, feedback at the end). \\
+FR-7 & The system shall grade written answers and return a score, covered points, missed points and feedback. \\
+FR-8 & The system shall run coding answers against test cases and report passed and failed cases. \\
+FR-9 & The system shall let the user retry only the questions answered incorrectly. \\
+FR-10 & The system shall store quiz history and statistics in the browser and allow it to be cleared. \\
+FR-11 & The system shall export a quiz as JSON and as Markdown. \\
+FR-12 & The system shall report available AI engines and capabilities through a status endpoint, and shall continue to work in an offline demo mode if the server is unreachable. \\
+\bottomrule
+\end{tabularx}
+\caption{Functional requirements}
+\label{tab:fr}
+\end{table}
+
+\section{Non-Functional Requirements}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{} p{3cm} X @{}}
+\toprule
+\textbf{Category} & \textbf{Requirement} \\
+\midrule
+Performance & A cloud-engine quiz should be produced in a few seconds; network calls use explicit time-outs (12~s for research, 45~s for generation, 15~s for grading, 5~s per code test). \\
+Reliability & Failure of any single research source, or of the cloud engine, must not prevent a quiz from being produced. \\
+Usability & Keyboard shortcuts, responsive layout, progress indicators and clear error messages. \\
+Portability & Runs on Windows, macOS and Linux with Python 3 and a modern browser. \\
+Privacy & Server is bound to \texttt{127.0.0.1}; history stays in the browser; secrets live in \texttt{.env}, which is excluded from version control. \\
+Maintainability & Backend split into small single-purpose modules; settings clamped in one place. \\
+Limits & Upload size is limited to 40~MB; model prompts are truncated to 30{,}000 characters (cloud) or 10{,}000 (local). \\
+\bottomrule
+\end{tabularx}
+\caption{Non-functional requirements}
+\label{tab:nfr}
+\end{table}
