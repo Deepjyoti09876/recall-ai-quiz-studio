@@ -55,3 +55,28 @@ def test_endpoints():
     assert "<urlset" in c.get("/sitemap.xml").text
     assert c.get("/llms.txt").text.startswith("# Recall")
     assert c.get("/manifest.webmanifest").json["short_name"] == "Recall"
+
+
+def test_grade_batch_parsing_and_fallback(monkeypatch):
+    items = [{"answer": "a", "model_answer": "m", "key_points": ["k"]}, {"answer": "b", "model_answer": "m2"}]
+    monkeypatch.setattr(q, "_grade_call", lambda *a, **k: {"grades": [
+        {"score": "85", "hits": ["k"], "misses": [], "feedback": "good", "misconception": "ignored when passing"},
+        {"score": 20, "hits": [], "misses": ["x"], "feedback": "weak", "misconception": "Confuses X with Y"}]})
+    g = q.grade_short_batch(items)
+    assert [x["score"] for x in g] == [85, 20] and g[0]["misconception"] is None and g[1]["misconception"] == "Confuses X with Y"
+    monkeypatch.setattr(q, "_grade_call", lambda *a, **k: {"grades": [{"score": 1}]})  # wrong length
+    assert [x["score"] for x in q.grade_short_batch(items)] == [0, 0]
+    def boom(*a, **k):
+        raise RuntimeError("down")
+    monkeypatch.setattr(q, "_grade_call", boom)
+    assert len(q.grade_short_batch(items)) == 2
+    assert len(q.grade_short_batch(items * 5)) == q.MAX_BATCH
+
+
+def test_grade_batch_endpoint(monkeypatch):
+    import recall.server as srv
+    monkeypatch.setattr(srv, "grade_short_batch", lambda items, engine="auto": [{"score": 90}] * len(items))
+    c = app.test_client()
+    assert c.post("/api/grade/batch", json={"items": []}).status_code == 400
+    r = c.post("/api/grade/batch", json={"items": [{"answer": "x"}, {"answer": "  "}]})
+    assert r.status_code == 200 and len(r.json["grades"]) == 1

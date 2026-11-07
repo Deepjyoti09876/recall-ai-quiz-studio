@@ -582,6 +582,7 @@
     const wrong = z.items.filter((q, j) => q.type === "mcq" && status(j) !== "right");
     const C = 2 * Math.PI * 88;
     const written = z.items.filter((q) => q.type !== "mcq").length;
+    const ungraded = ungradedShort(z);
 
     $("#view-results").innerHTML = `
       <div class="res-top glass">
@@ -603,6 +604,7 @@
       <div class="strip" aria-label="Result per question">${z.items.map((_, j) => `<i class="${status(j)}" title="Question ${j + 1}"></i>`).join("")}</div>
       <div class="actions">
         <button class="btn primary" data-act="adaptive">${ico("brain")}Adaptive next quiz</button>
+        ${ungraded.length && !S.demo ? `<button class="btn" data-act="gradebatch">${ico("pen")}Grade ${ungraded.length} written answer${ungraded.length > 1 ? "s" : ""} (1 AI call)</button>` : ""}
         <button class="btn" data-act="retry" ${wrong.length ? "" : "disabled"}>${ico("target")}Retry ${wrong.length} mistake${wrong.length === 1 ? "" : "s"}</button>
         <button class="btn" data-act="review-wrong" ${wrong.length ? "" : "disabled"}>${ico("x")}Review mistakes</button>
         <button class="btn" data-act="review-all">${ico("list")}Review all</button>
@@ -720,8 +722,23 @@
       `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${ico("link")}<span>${esc(s.title)}</span><span class="site">${esc(s.site || "")}</span></a></li>`).join("")}</ul></div>`;
   }
 
+  const ungradedShort = (z) => z.items.map((q, i) => i).filter((i) => z.items[i].type === "short" && (z.answers[i] || "").trim() && !z.grades[i]).slice(0, 6);
+  async function gradeBatch() {
+    const z = Q(), idx = ungradedShort(z);
+    if (!idx.length) return;
+    toast("Grading your written answers…");
+    try {
+      const r = await api("/api/grade/batch", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ engine: S.settings.engine, items: idx.map((i) => ({ answer: z.answers[i], model_answer: z.items[i].model_answer, key_points: z.items[i].key_points || [] })) }) });
+      (r.grades || []).forEach((g, k) => { z.grades[idx[k]] = g; commitItem(idx[k]); });
+      LR.save(true); renderDue();
+      if (Q() === z) renderResults();
+    } catch (e) { toast(e.message || "Grading failed.", true); }
+  }
+
   function resultsAction(act, el) {
     const z = Q();
+    if (act === "gradebatch") return gradeBatch();
     if (act === "revise") return startRevision();
     if (act === "adaptive") return adaptiveNext();
     if (act === "redrill") return redrill(el.dataset.concept);

@@ -7,6 +7,7 @@ Serves the website in /static and a small JSON API:
   POST /api/quiz/topic       quiz about any topic (researched on the web)
   POST /api/quiz/document    quiz from uploaded files and/or pasted text
   POST /api/grade            AI grading of a short answer
+  POST /api/grade/batch      grade up to 6 written answers with one model call
   POST /api/run              run code against test cases (Python sandbox)
   POST /api/export/markdown  quiz -> Markdown text
   GET  /robots.txt /sitemap.xml /llms.txt /manifest.webmanifest   crawler + install metadata
@@ -32,6 +33,7 @@ from .quiz_engine import (
     generate_topic_quiz,
     get_available_engines,
     grade_short_answer,
+    grade_short_batch,
     to_markdown,
 )
 from .sandbox import run_tests
@@ -162,6 +164,15 @@ def grade():
         return _error("Write an answer first.")
     return jsonify(grade_short_answer(d["answer"], d.get("model_answer", ""),
                                       d.get("key_points", []), engine=d.get("engine", "auto")))
+
+
+@app.post("/api/grade/batch")
+def grade_batch():
+    d = request.get_json(silent=True) or {}
+    items = [i for i in (d.get("items") or []) if isinstance(i, dict) and str(i.get("answer", "")).strip()]
+    if not items:
+        return _error("No written answers to grade.")
+    return jsonify({"grades": grade_short_batch(items, engine=d.get("engine", "auto"))})
 
 
 @app.post("/api/run")

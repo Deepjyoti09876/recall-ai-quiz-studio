@@ -433,6 +433,88 @@ def generate_quiz(text, difficulty="Medium", n_mcq=5, n_short=3, n_code=2,
     return _run_prompt(prompt, use_groq)
 
 
+GRADING_SYSTEM = (
+    "You are an expert university examiner for B.Tech Computer Science. "
+    "Respond with a single valid JSON object and nothing else (no markdown fences)."
+)
+
+
+def _grade_call(prompt: str, system: str, engine: str, timeout: int = 15) -> dict:
+    """One JSON-returning LLM call for grading (Groq if available, else local Ollama). Raises on failure."""
+    api_key = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
+    use_groq = (engine == "groq") or (engine == "auto" and bool(api_key and api_key.startswith("gsk_")))
+    if use_groq:
+        gbody = {
+            "model": GROQ_MODEL,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        if GROQ_MODEL.startswith("openai/gpt-oss"):
+            gbody["reasoning_effort"] = "low"
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions", data=json.dumps(gbody).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Recall/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return _parse(data["choices"][0]["message"]["content"])
+    import ollama
+    response = ollama.chat(
+        model=LOCAL_MODEL,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        format="json", stream=False)
+    return _parse(response.message.content)
+
+
+def _clean_grade(g, key_points) -> dict:
+    """Coerce one grade object to the shape the UI expects."""
+    g = g if isinstance(g, dict) else {}
+    try:
+        score = max(0, min(100, int(float(g.get("score", 0)))))
+    except (TypeError, ValueError):
+        score = 0
+    mis = g.get("misconception")
+    return {
+        "score": score,
+        "hits": [str(x) for x in (g.get("hits") or []) if x][:10],
+        "misses": [str(x) for x in (g.get("misses") or []) if x][:10],
+        "feedback": str(g.get("feedback") or "")[:500],
+        "misconception": str(mis)[:200] if mis and score < 70 and str(mis).lower() != "null" else None,
+    }
+
+
+MAX_BATCH = 6
+
+
+def grade_short_batch(items: list[dict], engine="auto") -> list[dict]:
+    """Grade several written answers with ONE model call. items: [{answer, model_answer, key_points}].
+
+    Always returns one grade per item; on failure each item gets a neutral 'could not grade' result.
+    """
+    items = (items or [])[:MAX_BATCH]
+    blocks = []
+    for n, it in enumerate(items, 1):
+        kps = "\n".join(f"  - {k}" for k in (it.get("key_points") or [])) or "  none"
+        blocks.append(f"### Answer {n}\nModel answer: {it.get('model_answer', '')}\nKey points:\n{kps}\n"
+                      f"Student answer: {str(it.get('answer', ''))[:1500]}")
+    prompt = ("Grade each student answer against its model answer and key points.\n\n" + "\n\n".join(blocks) +
+              '\n\nReturn a JSON object {"grades": [...]} with exactly ' + str(len(items)) + " entries in the same order. "
+              'Each entry: {"score": 0-100, "hits": [str], "misses": [str], "feedback": str, '
+              '"misconception": str or null (null if score >= 70)}.')
+    fallback = [{"score": 0, "hits": [], "misses": list(it.get("key_points") or []), "misconception": None,
+                 "feedback": "Could not grade automatically. Compare with the model answer."} for it in items]
+    if not items:
+        return []
+    try:
+        data = _grade_call(prompt, GRADING_SYSTEM, engine, timeout=40)
+        grades = data.get("grades") if isinstance(data, dict) else None
+        if not isinstance(grades, list) or len(grades) != len(items):
+            return fallback
+        return [_clean_grade(g, it.get("key_points")) for g, it in zip(grades, items)]
+    except Exception:
+        return fallback
+
+
 def grade_short_answer(user_answer: str, model_answer: str, key_points: list[str], engine="auto") -> dict:
     """Grade a short answer against model answer and key points."""
     key_points_text = "\n".join(f"- {kp}" for kp in key_points) if key_points else "None"
@@ -457,48 +539,10 @@ Return a valid JSON object with the following fields:
   "misconception": "the specific misunderstanding the answer shows, or null if score >= 70"
 }}"""
 
-    system_grading = (
-        "You are an expert university examiner for B.Tech Computer Science. "
-        "Respond with a single valid JSON object and nothing else (no markdown fences)."
-    )
-
-    api_key = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
-    use_groq = (engine == "groq") or (engine == "auto" and bool(api_key and api_key.startswith("gsk_")))
+    system_grading = GRADING_SYSTEM
 
     try:
-        if use_groq:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            gbody = {
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": system_grading},
-                    {"role": "user", "content": prompt}
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.2
-            }
-            if GROQ_MODEL.startswith("openai/gpt-oss"):
-                gbody["reasoning_effort"] = "low"
-            payload = json.dumps(gbody).encode("utf-8")
-            req = urllib.request.Request(
-                url, data=payload,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Recall/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                return _parse(data["choices"][0]["message"]["content"])
-        else:
-            import ollama
-            response = ollama.chat(
-                model=LOCAL_MODEL,
-                messages=[
-                    {"role": "system", "content": system_grading},
-                    {"role": "user", "content": prompt},
-                ],
-                format="json",
-                stream=False,
-            )
-            return _parse(response.message.content)
+        return _grade_call(prompt, system_grading, engine, timeout=15)
     except Exception:
         return {
             "score": 0,
