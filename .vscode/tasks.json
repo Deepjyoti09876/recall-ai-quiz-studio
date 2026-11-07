@@ -14,20 +14,6 @@
         "clear": true
       },
       "problemMatcher": []
-    },
-    {
-      "label": "Open Recall in VS Code",
-      "type": "shell",
-      "command": "${workspaceFolder}\\open_in_vscode.bat",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
     }
   ]
 }

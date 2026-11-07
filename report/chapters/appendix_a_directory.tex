@@ -5,6 +5,8 @@ The following listing shows the top-level file organisation of the source reposi
 recall-ai-quiz-studio/
 |-- README.md
 |-- requirements.txt
+|-- requirements-dev.txt
+|-- run_recall.bat
 |-- .env.example
 |-- .gitignore
 |-- recall/
@@ -14,10 +16,15 @@ recall-ai-quiz-studio/
 |   |-- research.py        Wikipedia / DuckDuckGo / Tavily research
 |   |-- file_loader.py     PDF / DOCX / PPTX / TXT / MD extraction
 |   |-- sandbox.py         Python code runner with test cases
+|   |-- rag.py             local retrieval for long documents
 |   `-- static/
 |       |-- index.html
 |       |-- styles.css
-|       `-- app.js
+|       |-- app.js
+|       |-- learning.js    mastery and scheduling maths
+|       |-- insights.js    dashboard and knowledge graph
+|       `-- tests/
+|-- tests/                 pytest suite
 |-- legacy_streamlit/
 |   |-- app.py
 |   |-- theme.py
