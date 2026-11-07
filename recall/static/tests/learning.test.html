@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Learning core tests</title>
+<style>body{font:14px/1.5 monospace;background:#0a1130;color:#e6eeff;padding:20px}.p{color:#6fd8a0}.f{color:#f0919f}</style></head>
+<body><h1>Learning core tests</h1><pre id="out"></pre>
+<script src="../learning.js"></script><script src="learning.tests.js"></script>
+<script>
+  const out = document.getElementById("out"); let fails = 0;
+  runLearningTests(RecallLearning, (name, ok, info) => {
+    if (!ok) fails++;
+    out.insertAdjacentHTML("beforeend", `<span class="${ok ? "p" : "f"}">${ok ? "PASS" : "FAIL"}</span> ${name}${ok ? "" : " " + JSON.stringify(info)}\n`);
+  });
+  out.insertAdjacentHTML("beforeend", `\n${fails ? fails + " FAILED" : "ALL PASSED"} (note: resets your recall.learning data)\n`);
+</script></body></html>

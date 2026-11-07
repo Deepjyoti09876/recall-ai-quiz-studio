@@ -36,7 +36,11 @@
     link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
     spark: '<path d="M12 2.5l2.4 6.6 6.6 2.4-6.6 2.4L12 20.5l-2.4-6.6L3 11.5l6.6-2.4z"/>',
+    chart: '<path d="M4 20V4M4 20h16"/><path d="m8 15 3-4 3 2 5-6"/>',
+    graph: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="m8 7 8 1M7 8l4 8M17 10l-4 6"/>',
+    brain: '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V4a3 3 0 0 0-3 0z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>',
   };
+  const LR = window.RecallLearning;
   const ico = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n] || ""}</svg>`;
   const hydrate = (root = document) => root.querySelectorAll("i[data-i]").forEach((el) => {
     const t = document.createElement("template");
@@ -101,6 +105,7 @@
     settings: Object.assign({
       difficulty: "Medium", mode: "Practice", n_mcq: 5, n_short: 2, n_code: 0,
       language: "Python", timer: 15, engine: "auto", depth: "standard", use_web: true,
+      askConf: true, adaptive: false,
     }, store.get("settings", {})),
     quiz: null,     // active quiz session
     abort: null,
@@ -117,12 +122,12 @@
   }
 
   /* ---------------- views ---------------- */
-  const VIEWS = ["home", "loading", "quiz", "results", "review", "history"];
+  const VIEWS = ["home", "loading", "quiz", "results", "review", "history", "insights"];
   function show(view) {
     VIEWS.forEach((v) => { $("#view-" + v).hidden = v !== view; });
     $("#shell").classList.remove("nav-open");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    setNav(view === "history" ? "history" : view === "home" ? (S.source === "docs" ? "docs" : "home") : null);
+    setNav(view === "history" || view === "insights" ? view : view === "home" ? (S.source === "docs" ? "docs" : "home") : null);
     if (view !== "quiz") stopTimer();
   }
   function setNav(key) {
@@ -150,6 +155,8 @@
     $("#timerSelect").value = String(st.timer);
     $("#depthSelect").value = st.depth;
     $("#webToggle").checked = st.use_web;
+    $("#adaptToggle").checked = !!st.adaptive;
+    $("#confToggle").checked = st.askConf !== false;
     const parts = [];
     if (st.n_mcq) parts.push(`${st.n_mcq} MCQ`);
     if (st.n_short) parts.push(`${st.n_short} written`);
@@ -227,7 +234,7 @@
       kind = st.use_web ? "topic" : "topicOffline";
       request = () => api("/api/quiz/topic", {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: S.abort.signal,
-        body: JSON.stringify({ ...payloadSettings(), topic, use_web: st.use_web, depth: st.depth }),
+        body: JSON.stringify({ ...payloadSettings(true), topic, use_web: st.use_web, depth: st.depth }),
       });
     } else {
       const text = $("#pasteInput").value;
@@ -237,7 +244,7 @@
       const fd = new FormData();
       S.files.forEach((f) => fd.append("files", f));
       fd.append("text", text);
-      fd.append("settings", JSON.stringify(payloadSettings()));
+      fd.append("settings", JSON.stringify(payloadSettings(true)));
       request = () => api("/api/quiz/document", { method: "POST", body: fd, signal: S.abort.signal });
     }
 
@@ -266,24 +273,35 @@
       if (e.name !== "AbortError") toast(e.message || "Something went wrong.", true);
     }
   }
-  const payloadSettings = () => {
+  /* Request settings. With "Adapt to me" on, difficulty and focus come from the learner's mastery. */
+  function payloadSettings(allowAdapt = false) {
     const { difficulty, n_mcq, n_short, n_code, language, engine } = S.settings;
-    return { difficulty, n_mcq, n_short, n_code, language, engine };
-  };
+    const out = { difficulty, n_mcq, n_short, n_code, language, engine, concept_vocab: LR.vocab(40) };
+    if (allowAdapt && S.settings.adaptive) {
+      const rec = LR.recommend();
+      if (rec.concepts.length) { out.focus_concepts = rec.concepts; out.focus_notes = rec.notes; }
+      if (LR.conceptList().some((c) => c.n > 0)) out.difficulty = rec.difficulty;  // keep the chosen level until there is data
+    }
+    return out;
+  }
 
   /* ---------------- quiz session ---------------- */
   const TYPE_LABEL = { mcq: "Multiple choice", short: "Written answer", coding: "Coding" };
   function flatten(quiz) {
     return ["mcq", "short", "coding"].flatMap((t) => (quiz[t] || []).map((q) => ({ ...q, type: t })));
   }
-  function startQuiz({ quiz, title, source, sources, difficulty, mode, timer, items, historyId, retry = 0 }) {
-    const qs = items || flatten(quiz);
+  function startQuiz({ quiz, title, source, sources, difficulty, mode, timer, items, historyId, retry = 0, kind }) {
+    if (!items) quiz = LR.normalizeQuiz(quiz || {});
+    const qs = (items || flatten(quiz)).map((q) => ({ ...q, qid: q.qid || LR.qid(q) }));
     if (!qs.length) { toast("The AI returned no usable questions. Try again.", true); show("home"); return; }
+    kind = retry ? "retry" : (kind || "quiz");
     S.quiz = {
       id: historyId || "q" + Date.now(), quiz, title, source, sources: sources || [], difficulty, mode,
       timer: +timer || 15, items: qs, answers: {}, revealed: {}, grades: {}, code: {}, flagged: new Set(),
+      conf: {}, committed: {}, sessAtt: [], sessionSaved: false, kind,
       i: 0, started: Date.now(), finished: null, retry,
     };
+    if (quiz && quiz.concepts && kind !== "revision") LR.mergeGraph(quiz.concepts, title);
     $("#quizName").textContent = title + (retry ? ` · retry ${retry}` : "");
     $("#flagBtn").hidden = mode !== "Exam";
     show("quiz");
@@ -328,10 +346,18 @@
     }).join("");
 
     let body = `<span class="qtype">${ico(q.type === "mcq" ? "list" : q.type === "short" ? "pen" : "code")}${TYPE_LABEL[q.type]}</span>
+      ${q.concept && q.concept !== "General" ? `<span class="concept-chip">${esc(q.concept)}</span>` : ""}
       <div class="qtext">${esc(q.question)}</div>`;
+    const showConf = S.settings.askConf !== false && q.type !== "coding";
+    const awaiting = practice && z.awaiting === i && q.type === "mcq" && !z.revealed[i];
+    const confBar = showConf ? `<div class="conf-seg${awaiting ? " ask" : ""}" role="group" aria-label="How sure are you?">
+        <span class="conf-l">${awaiting ? "How sure are you? Pick to see the answer" : "How sure are you?"}</span>
+        ${[["guess", "Guess", "G"], ["unsure", "Unsure", "U"], ["sure", "Sure", "S"]].map(([v, l, k]) =>
+          `<button type="button" data-conf="${v}" class="${z.conf[i] === v ? "on" : ""}" aria-pressed="${z.conf[i] === v}">${l}<kbd>${k}</kbd></button>`).join("")}</div>` : "";
 
     if (q.type === "mcq") {
       const picked = z.answers[i], locked = practice && z.revealed[i];
+      body += confBar;
       body += `<div class="options">${q.options.map((o, j) => {
         let cls = "opt", mark = "";
         if (locked) {
@@ -345,9 +371,12 @@
         body += `<div class="feedback ${ok ? "ok" : "bad"}"><b class="h">${ico(ok ? "check" : "x")}${ok ? "Correct." : "Not quite."}</b>
           ${ok ? "" : `The answer is <b>${esc(correctText(q))}</b>. `}${esc(q.explanation || "")}
           ${q.source_quote ? `<div class="quote">“${esc(q.source_quote)}”</div>` : ""}</div>`;
+        const mis = !ok && (q.misconceptions || [])[q.options.indexOf(picked)];
+        if (mis) body += `<div class="misc-note" aria-live="polite"><b>Why this option was tempting:</b> ${esc(mis)}</div>`;
       }
     } else if (q.type === "short") {
       const val = z.answers[i] ?? "";
+      body += confBar;
       body += `<textarea class="answer-box" id="ansBox" placeholder="Write your answer in your own words…">${esc(val)}</textarea>`;
       if (practice) {
         body += `<div class="row-actions"><button class="btn primary sm" id="gradeBtn">${ico("target")}Check with AI</button>
@@ -398,6 +427,7 @@
   function wireQuestion(i, q) {
     const z = Q();
     $$("[data-opt]").forEach((b) => b.onclick = () => pickOption(+b.dataset.opt));
+    $$("[data-conf]").forEach((b) => b.onclick = () => setConf(b.dataset.conf));
     const ans = $("#ansBox");
     if (ans) ans.oninput = () => { z.answers[i] = ans.value; };
     const code = $("#codeBox");
@@ -426,8 +456,60 @@
     const z = Q(), i = z.i, q = z.items[i];
     if (q.type !== "mcq" || (z.mode === "Practice" && z.revealed[i])) return;
     z.answers[i] = q.options[j];
-    if (z.mode === "Practice") z.revealed[i] = true;
+    if (z.mode === "Practice") {
+      if (S.settings.askConf !== false && !z.conf[i]) { z.awaiting = i; renderQuestion(); return; }  // ask confidence first
+      reveal(i);
+      return;
+    }
     renderQuestion();
+  }
+  function reveal(i) {
+    const z = Q();
+    z.revealed[i] = true;
+    z.awaiting = null;
+    commitItem(i);
+    renderQuestion();
+  }
+  function setConf(c) {
+    const z = Q(), i = z.i, q = z.items[i];
+    if (z.committed[i]) return;  // already counted
+    z.conf[i] = z.conf[i] === c ? null : c;
+    if (z.mode === "Practice" && q.type === "mcq" && z.answers[i] != null && !z.revealed[i] && z.conf[i]) { reveal(i); return; }
+    renderQuestion();
+  }
+
+  /* ---------------- learning: record outcomes ---------------- */
+  function outcome(i) {
+    const z = Q(), q = z.items[i];
+    if (q.type === "mcq") { const s = status(i); return s === "right" ? true : s === "wrong" ? false : null; }
+    if (q.type === "short") return z.grades[i] && z.grades[i].score != null && !z.grades[i].loading ? z.grades[i].score >= 70 : null;
+    const r = z.code[i];
+    return r && r.total != null ? r.passed === r.total : null;
+  }
+  function commitItem(i) {
+    const z = Q(), q = z.items[i];
+    if (z.committed[i]) return;
+    const correct = outcome(i);
+    if (correct == null) return;
+    z.committed[i] = true;
+    let misc = null;
+    if (!correct) {
+      if (q.type === "mcq") misc = (q.misconceptions || [])[q.options.indexOf(z.answers[i])] || null;
+      else if (q.type === "short") misc = (z.grades[i] || {}).misconception || null;
+    }
+    const conf = q.type === "coding" ? null : z.conf[i] || null;
+    LR.recordAttempt({ item: q, correct, conf, misc, kind: z.kind });
+    z.sessAtt.push({ conf, correct });
+  }
+  function commitSession() {
+    const z = Q();
+    z.items.forEach((_, i) => commitItem(i));
+    if (z.sessionSaved) return;
+    z.sessionSaved = true;
+    const { right, total } = tally();
+    LR.recordSession({ id: z.id, title: z.title, kind: z.kind, total, correct: right, attempts: z.sessAtt });
+    LR.save(true);
+    renderDue();
   }
 
   async function gradeShort(i, q) {
@@ -443,6 +525,7 @@
     } catch (e) {
       z.grades[i] = { score: 0, hits: [], misses: q.key_points || [], feedback: "Grading failed: " + e.message };
     }
+    if (z.mode === "Practice") commitItem(i);
     if (Q() === z && z.i === i) renderQuestion();
   }
 
@@ -456,6 +539,7 @@
       z.code[i] = await api("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, test_cases: q.test_cases, language: q.language || "python" }) });
     } catch (e) { z.code[i] = { error: e.message }; }
+    if (z.mode === "Practice") commitItem(i);
     if (Q() === z && z.i === i) renderQuestion();
   }
 
@@ -483,6 +567,7 @@
     const z = Q();
     z.finished = Date.now();
     stopTimer();
+    commitSession();
     saveHistory();
     renderResults();
     show("results");
@@ -514,9 +599,11 @@
         <div class="metric glass"><div class="v">${written}</div><div class="l">Written / code</div></div>
         <div class="metric glass"><div class="v">${fmtTime(secs)}</div><div class="l">Time taken</div></div>
       </div>
+      ${learningPanels(z)}
       <div class="strip" aria-label="Result per question">${z.items.map((_, j) => `<i class="${status(j)}" title="Question ${j + 1}"></i>`).join("")}</div>
       <div class="actions">
-        <button class="btn primary" data-act="retry" ${wrong.length ? "" : "disabled"}>${ico("target")}Retry ${wrong.length} mistake${wrong.length === 1 ? "" : "s"}</button>
+        <button class="btn primary" data-act="adaptive">${ico("brain")}Adaptive next quiz</button>
+        <button class="btn" data-act="retry" ${wrong.length ? "" : "disabled"}>${ico("target")}Retry ${wrong.length} mistake${wrong.length === 1 ? "" : "s"}</button>
         <button class="btn" data-act="review-wrong" ${wrong.length ? "" : "disabled"}>${ico("x")}Review mistakes</button>
         <button class="btn" data-act="review-all">${ico("list")}Review all</button>
         <button class="btn" data-act="retake">${ico("replay")}Retake quiz</button>
@@ -530,14 +617,115 @@
       if (el) el.style.strokeDashoffset = C * (1 - (pct ?? 100) / 100);
     }, 60));
   }
+  const CAL_QUADS = [
+    ["solid", "Solid mastery", "Sure and right"], ["fragile", "Fragile knowledge", "Right, but unsure or guessing"],
+    ["blind", "Misconception", "Sure but wrong: fix these first"], ["gap", "Known gap", "Wrong and unsure"],
+  ];
+  function learningPanels(z) {
+    const cal = LR.calibration(z.sessAtt);
+    let html = "";
+    if (cal.n) {
+      const note = cal.quads.blind ? `${cal.quads.blind} confident mistake${cal.quads.blind > 1 ? "s" : ""}: these are likely misconceptions, not gaps.`
+        : cal.quads.fragile > cal.quads.solid ? "Many right answers were guesses or unsure. Review them before they fade."
+        : "Your confidence matched your results well.";
+      html += `<section class="panel-block glass" aria-label="Confidence check"><div class="panel-title">${ico("target")} Confidence check</div>
+        <div class="quad">${CAL_QUADS.map(([k, t, d]) => `<div class="q-${k}"><b>${cal.quads[k]}</b><span>${t}</span><small>${d}</small></div>`).join("")}</div>
+        <p class="muted note">${note}</p></section>`;
+    }
+    const groups = {};
+    z.items.forEach((q, i) => {
+      const o = outcome(i);
+      if (o !== false) return;
+      const g = (groups[q.concept || "General"] = groups[q.concept || "General"] || { misc: [] });
+      let m = null;
+      if (q.type === "mcq") m = (q.misconceptions || [])[q.options.indexOf(z.answers[i])];
+      else if (q.type === "short") m = (z.grades[i] || {}).misconception;
+      if (m && !g.misc.includes(m)) g.misc.push(m);
+    });
+    const names = Object.keys(groups);
+    if (names.length) {
+      html += `<section class="panel-block glass" aria-label="Mistake analysis"><div class="panel-title">${ico("brain")} Mistake analysis</div>
+        ${names.map((n) => {
+          const c = LR.state().concepts[LR.keyOf(n)];
+          const pl = c ? Math.round(c.pL * 100) : 0;
+          const can = LR.cardsForConcept(n).length;
+          return `<div class="mistake"><div class="m-head"><b>${esc(n)}</b>${masteryBar(pl)}</div>
+            ${groups[n].misc.length ? `<ul class="kp">${groups[n].misc.map((m) => `<li class="miss">${ico("x")}${esc(m)}</li>`).join("")}</ul>` : ""}
+            <div class="row-actions">${can ? `<button class="btn sm" data-act="redrill" data-concept="${esc(n)}">${ico("replay")}Re-drill offline (${can})</button>` : ""}
+            ${S.demo ? "" : `<button class="btn sm" data-act="practice" data-concept="${esc(n)}">${ico("spark")}New questions on this</button>`}</div></div>`;
+        }).join("")}</section>`;
+    }
+    return html;
+  }
+  const masteryBar = (pl) => `<span class="mastery-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pl}" aria-label="Mastery ${pl}%"><span class="${pl < 40 ? "bad" : pl < 80 ? "warn" : "ok"}" style="width:${pl}%"></span></span><small class="muted">${pl}%</small>`;
+
+  /* ---------------- focused generation (adaptive / practice-this) & revision ---------------- */
+  async function generateFocused({ topic, title, focus, notes, difficulty, kind, useWeb = false, n_mcq = 5 }) {
+    if (S.demo) { toast("Start the local server to generate new questions.", true); return; }
+    S.abort = new AbortController();
+    startLoading(useWeb ? "topic" : "topicOffline", `Building a quiz on “${title}”`);
+    try {
+      const data = await api("/api/quiz/topic", {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal: S.abort.signal,
+        body: JSON.stringify({ ...payloadSettings(), n_mcq, n_short: 0, n_code: 0, difficulty, topic, use_web: useWeb, depth: S.settings.depth,
+          focus_concepts: focus, focus_notes: notes }),
+      });
+      stopLoading();
+      startQuiz({ quiz: data.quiz, title, source: "topic", sources: data.sources || [], difficulty, mode: "Practice", timer: S.settings.timer, kind });
+    } catch (e) {
+      stopLoading(); show("home");
+      if (e.name !== "AbortError") toast(e.message || "Something went wrong.", true);
+    }
+  }
+  function practiceConcept(name, notes) {
+    const z = S.quiz && !$("#view-results").hidden ? S.quiz : null;  // only add quiz context when called from its results
+    const topic = z && z.title ? `${name} (${z.title})` : name;
+    const n = notes || LR.weakMisconceptions(20).filter((m) => LR.keyOf(m.concept) === LR.keyOf(name)).slice(0, 3).map((m) => m.misc);
+    return generateFocused({ topic, title: "Practice · " + name, focus: [name], notes: n, difficulty: LR.suggestDifficulty([name]), kind: "practice-this" });
+  }
+  function adaptiveNext() {
+    const rec = LR.recommend();
+    const z = S.quiz && !$("#view-results").hidden ? S.quiz : null;
+    const base = rec.concepts[0] ? (z && z.title ? `${rec.concepts[0]} (${z.title})` : rec.concepts[0]) : (z ? z.title : "");
+    if (!base) { toast("Take a quiz first so Recall can adapt to you.", true); return; }
+    return generateFocused({ topic: base, title: "Adaptive · " + (rec.concepts[0] || (z && z.title)), focus: rec.concepts, notes: rec.notes,
+      difficulty: rec.difficulty, kind: "quiz", useWeb: !!(z && z.source === "topic" && S.settings.use_web) });
+  }
+  function startRevision(list) {
+    const cards = (list || LR.dueCards()).slice(0, 15);
+    if (!cards.length) { toast("Nothing is due for review right now."); return; }
+    startQuiz({ quiz: {}, items: cards.map((c) => ({ ...c.item, qid: c.qid, concept: c.concept })), title: `Revision · ${cards.length} due`,
+      source: "revision", sources: [], difficulty: "Mixed", mode: "Practice", timer: S.settings.timer, kind: "revision" });
+  }
+  function redrill(name) {
+    const cards = LR.cardsForConcept(name).slice(0, 10);
+    if (!cards.length) { toast("No stored questions for this concept yet.", true); return; }
+    startQuiz({ quiz: {}, items: cards.map((c) => ({ ...c.item, qid: c.qid, concept: c.concept })), title: `Re-drill · ${name}`,
+      source: "revision", sources: [], difficulty: "Mixed", mode: "Practice", timer: S.settings.timer, retry: 1 });
+  }
+  function renderDue() {
+    const n = LR.dueCards().length;
+    const b = $("#dueBadge");
+    if (b) { b.hidden = !n; b.textContent = n; }
+    const card = $("#dueCard");
+    if (card) {
+      card.hidden = !n;
+      if (n) $("#dueText").textContent = `${n} question${n > 1 ? "s" : ""} due for spaced repetition`;
+    }
+  }
+
   function renderSources(src) {
     if (!src || !src.length) return "";
     return `<div class="sources glass"><div class="panel-title" style="margin:0">${ico("globe")} Sources used</div><ul>${src.map((s) =>
       `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${ico("link")}<span>${esc(s.title)}</span><span class="site">${esc(s.site || "")}</span></a></li>`).join("")}</ul></div>`;
   }
 
-  function resultsAction(act) {
+  function resultsAction(act, el) {
     const z = Q();
+    if (act === "revise") return startRevision();
+    if (act === "adaptive") return adaptiveNext();
+    if (act === "redrill") return redrill(el.dataset.concept);
+    if (act === "practice") return practiceConcept(el.dataset.concept);
     if (act === "retry") {
       const items = z.items.filter((q, j) => q.type === "mcq" && status(j) !== "right");
       startQuiz({ ...z, mode: "Practice", items, retry: (z.retry || 0) + 1, historyId: null });
@@ -545,7 +733,8 @@
       renderReview(act === "review-wrong");
       show("review");
     } else if (act === "retake") {
-      startQuiz({ ...z, items: null, retry: 0, historyId: null });
+      if (z.kind === "revision") return startRevision();
+      startQuiz({ ...z, items: null, retry: 0, historyId: null, kind: z.kind === "retry" ? "quiz" : z.kind });
     } else if (act === "json") {
       download(slug(z.title) + ".json", JSON.stringify(z.quiz, null, 2), "application/json");
     } else if (act === "md") {
@@ -575,10 +764,12 @@
       const s = status(i);
       if (onlyWrong && !(q.type === "mcq" && s !== "right")) return "";
       const a = z.answers[i];
-      let b = `<span class="chip ${s}">${ico(L[s][0])}${L[s][1]}</span><div class="qtext">${i + 1}. ${esc(q.question)}</div>`;
+      let b = `<span class="chip ${s}">${ico(L[s][0])}${L[s][1]}</span>${q.concept && q.concept !== "General" ? `<span class="concept-chip">${esc(q.concept)}</span>` : ""}<div class="qtext">${i + 1}. ${esc(q.question)}</div>`;
       if (q.type === "mcq") {
         b += `<span class="k">Your answer</span><p>${a ? esc(a) : "—"}</p>`;
         if (s !== "right") b += `<span class="k">Correct answer</span><p style="color:var(--ok)">${esc(correctText(q))}</p>`;
+        const mis = s === "wrong" && (q.misconceptions || [])[q.options.indexOf(a)];
+        if (mis) b += `<span class="k">Why it was tempting</span><p>${esc(mis)}</p>`;
         if (q.explanation) b += `<span class="k">Why</span><p>${esc(q.explanation)}</p>`;
         if (q.source_quote) b += `<div class="quote">“${esc(q.source_quote)}”</div>`;
       } else if (q.type === "short") {
@@ -600,7 +791,7 @@
   /* ---------------- history & stats ---------------- */
   function saveHistory() {
     const z = Q();
-    if (z.retry) return; // only store original attempts
+    if (z.retry || z.kind === "revision") return; // only store original attempts
     const { right, total } = tally();
     const hist = store.get("history", []).filter((h) => h.id !== z.id);
     hist.unshift({
@@ -678,15 +869,21 @@
 
   /* ---------------- demo content (used only when the server is offline) ---------------- */
   const DEMO_QUIZ = {
+    concepts: [
+      { name: "Binary Search", prereqs: ["Sorted Arrays", "Time Complexity"] },
+      { name: "Time Complexity", prereqs: [] },
+      { name: "Sorted Arrays", prereqs: [] },
+      { name: "Integer Overflow", prereqs: [] },
+    ],
     mcq: [
-      { question: "What is the time complexity of binary search on a sorted array of n elements?", options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"], answer_index: 1, explanation: "Each comparison halves the remaining search space, so at most about log₂ n steps are needed.", source_quote: "Binary search runs in logarithmic time in the worst case, making O(log n) comparisons." },
-      { question: "Which precondition must hold before binary search can be applied?", options: ["The array must contain no duplicates", "The array must be sorted", "The array length must be a power of two", "The array must be stored in a linked list"], answer_index: 1, explanation: "Binary search relies on ordering to discard half of the elements after each comparison.", source_quote: "Binary search compares the target value to the middle element of a sorted array." },
-      { question: "In the expression mid = (low + high) / 2, what problem can occur in languages with fixed-size integers?", options: ["Division by zero", "Integer overflow when low + high is very large", "Floating-point rounding errors", "Stack overflow"], answer_index: 1, explanation: "low + high can exceed the maximum int; mid = low + (high - low) / 2 avoids this.", source_quote: "A common bug is overflow in the computation of the midpoint." },
-      { question: "Searching for 23 in [2, 5, 8, 12, 16, 23, 38, 56, 72, 91], which element is compared first (using floor of the middle index)?", options: ["16", "23", "12", "38"], answer_index: 0, explanation: "Indices 0–9 give mid = 4, so the first comparison is with arr[4] = 16.", source_quote: "" },
-      { question: "What does binary search return when the target is not present (classic version)?", options: ["The middle index", "The last index checked", "An indication of absence, such as -1", "The index of the largest element"], answer_index: 2, explanation: "When low passes high, the interval is empty and the search reports that the value is absent.", source_quote: "If the search ends with the remaining half being empty, the target is not in the array." },
+      { question: "What is the time complexity of binary search on a sorted array of n elements?", options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"], answer_index: 1, explanation: "Each comparison halves the remaining search space, so at most about log₂ n steps are needed.", source_quote: "Binary search runs in logarithmic time in the worst case, making O(log n) comparisons.", concept: "Time Complexity", misconceptions: ["Confuses binary search with scanning every element.", null, "Mixes it up with comparison sorting such as merge sort.", "Thinks halving means a single step regardless of size."] },
+      { question: "Which precondition must hold before binary search can be applied?", options: ["The array must contain no duplicates", "The array must be sorted", "The array length must be a power of two", "The array must be stored in a linked list"], answer_index: 1, explanation: "Binary search relies on ordering to discard half of the elements after each comparison.", source_quote: "Binary search compares the target value to the middle element of a sorted array.", concept: "Sorted Arrays", misconceptions: ["Believes duplicates break the halving logic.", null, "Thinks array size must be a power of two.", "Confuses arrays with linked lists, which lack random access."] },
+      { question: "In the expression mid = (low + high) / 2, what problem can occur in languages with fixed-size integers?", options: ["Division by zero", "Integer overflow when low + high is very large", "Floating-point rounding errors", "Stack overflow"], answer_index: 1, explanation: "low + high can exceed the maximum int; mid = low + (high - low) / 2 avoids this.", source_quote: "A common bug is overflow in the computation of the midpoint.", concept: "Integer Overflow", misconceptions: ["Thinks integer division by 2 can divide by zero.", null, "Assumes integer maths introduces rounding like floats.", "Mixes up arithmetic overflow with call-stack depth."] },
+      { question: "Searching for 23 in [2, 5, 8, 12, 16, 23, 38, 56, 72, 91], which element is compared first (using floor of the middle index)?", options: ["16", "23", "12", "38"], answer_index: 0, explanation: "Indices 0–9 give mid = 4, so the first comparison is with arr[4] = 16.", source_quote: "", concept: "Binary Search", misconceptions: [null, "Jumps straight to the target instead of starting at the middle.", "Counts the middle as index 3 (off by one).", "Takes the upper middle instead of the floor."] },
+      { question: "What does binary search return when the target is not present (classic version)?", options: ["The middle index", "The last index checked", "An indication of absence, such as -1", "The index of the largest element"], answer_index: 2, explanation: "When low passes high, the interval is empty and the search reports that the value is absent.", source_quote: "If the search ends with the remaining half being empty, the target is not in the array.", concept: "Binary Search", misconceptions: ["Thinks the search always ends on the middle element.", "Treats the last probed index as a result even when it does not match.", null, "Confuses absence with finding the maximum."] },
     ],
     short: [
-      { question: "Explain why binary search is faster than linear search on large sorted arrays.", model_answer: "Linear search may check every element (O(n)), while binary search halves the remaining range with each comparison (O(log n)), so for a million elements it needs about 20 comparisons instead of up to a million.", key_points: ["halves the search space", "O(log n) vs O(n)", "requires sorted data"] },
+      { question: "Explain why binary search is faster than linear search on large sorted arrays.", model_answer: "Linear search may check every element (O(n)), while binary search halves the remaining range with each comparison (O(log n)), so for a million elements it needs about 20 comparisons instead of up to a million.", key_points: ["halves the search space", "O(log n) vs O(n)", "requires sorted data"], concept: "Time Complexity" },
     ],
     coding: [],
   };
@@ -723,6 +920,7 @@
         const k = nav.dataset.nav;
         if (S.quiz && !$("#view-quiz").hidden && k !== "settings" && !(await ask("Leave this quiz? Your progress will be lost.", "Leave"))) return;
         if (k === "history") { renderHistory(); show("history"); }
+        else if (k === "insights") { if (window.RecallInsights) window.RecallInsights.render($("#view-insights")); show("insights"); }
         else if (k === "settings") openSettings();
         else presets(k);
         return;
@@ -733,7 +931,7 @@
       if (act) {
         if (act.dataset.act === "back") { show("results"); return; }
         if (act.dataset.act === "clear") { if (await ask("Delete all quiz history?", "Delete")) { store.set("history", []); renderHistory(); renderSidebar(); renderStats(); } return; }
-        resultsAction(act.dataset.act);
+        resultsAction(act.dataset.act, act);
         return;
       }
       const jump = e.target.closest("[data-jump]");
@@ -760,6 +958,9 @@
     $("#timerSelect").onchange = (e) => { S.settings.timer = +e.target.value; saveSettings(); };
     $("#depthSelect").onchange = (e) => { S.settings.depth = e.target.value; saveSettings(); };
     $("#webToggle").onchange = (e) => { S.settings.use_web = e.target.checked; saveSettings(); };
+    $("#adaptToggle").onchange = (e) => { S.settings.adaptive = e.target.checked; saveSettings(); toast(e.target.checked ? "Adapting to you: difficulty and focus follow your mastery." : "Adaptive mode off."); };
+    $("#confToggle").onchange = (e) => { S.settings.askConf = e.target.checked; saveSettings(); };
+    $("#reviseBtn").onclick = () => startRevision();
     $("#engineSelect").onchange = (e) => { S.settings.engine = e.target.value; saveSettings(); updateEngineCard(); };
 
     // files
@@ -783,7 +984,7 @@
     $("#prevBtn").onclick = () => go(-1);
     $("#nextBtn").onclick = () => go(1);
     $("#flagBtn").onclick = () => { const z = Q(); z.flagged.has(z.i) ? z.flagged.delete(z.i) : z.flagged.add(z.i); renderQuestion(); };
-    $("#exitQuiz").onclick = async () => { if (await ask("Exit this quiz? Your progress will be lost.", "Exit")) { stopTimer(); show("home"); } };
+    $("#exitQuiz").onclick = async () => { if (await ask("Exit this quiz? Your progress will be lost.", "Exit")) { stopTimer(); LR.save(true); renderDue(); show("home"); } };
 
     // keyboard
     document.addEventListener("keydown", (e) => {
@@ -794,7 +995,8 @@
       if (typing) return;
       const q = Q().items[Q().i];
       const k = e.key.toLowerCase();
-      if (q.type === "mcq" && ["1", "2", "3", "4", "a", "b", "c", "d"].includes(k)) { pickOption("1234".includes(k) ? +k - 1 : "abcd".indexOf(k)); }
+      if (q.type !== "coding" && S.settings.askConf !== false && ["g", "u", "s"].includes(k)) { setConf({ g: "guess", u: "unsure", s: "sure" }[k]); }
+      else if (q.type === "mcq" && ["1", "2", "3", "4", "a", "b", "c", "d"].includes(k)) { pickOption("1234".includes(k) ? +k - 1 : "abcd".indexOf(k)); }
       else if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); go(1); }
       else if (e.key === "ArrowLeft") go(-1);
     });
@@ -830,6 +1032,9 @@
   }
 
   /* ---------------- boot ---------------- */
+  window.RecallUI = { $, $$, esc, ico, toast, ask, show, download, startRevision, practiceConcept, adaptiveNext, renderDue };
+  LR.load();
+  LR.onError(() => toast("Browser storage is full: older learning data was trimmed.", true));
   hydrate();
   buildSteppers();
   renderSuggestions();
@@ -838,6 +1043,7 @@
   setAvatar();
   renderSidebar();
   renderStats();
+  renderDue();
   bind();
   loadStatus();
   requestAnimationFrame(moveInk);

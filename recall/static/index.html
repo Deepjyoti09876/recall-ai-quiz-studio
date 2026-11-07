@@ -3,8 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Recall · AI Quiz Studio</title>
-  <meta name="description" content="Turn any topic or document into a quiz in seconds.">
+  <title>Recall — Adaptive AI Quiz Generator, Spaced Repetition &amp; Knowledge Graph</title>
+  <meta name="description" content="Transform PDFs, notes and topics into adaptive quizzes powered by Bayesian Knowledge Tracing, SM-2 spaced repetition, local hybrid retrieval and prerequisite knowledge graphs.">
+  <meta name="theme-color" content="#0a1130">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Recall">
+  <meta property="og:title" content="Recall — Adaptive AI Quiz Generator">
+  <meta property="og:description" content="Adaptive quizzes from any topic or document, with spaced repetition, confidence calibration and a concept knowledge graph.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Recall — Adaptive AI Quiz Generator">
+  <meta name="twitter:description" content="Adaptive quizzes from any topic or document, with spaced repetition and a knowledge graph.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@graph":[
+    {"@type":"WebApplication","name":"Recall","applicationCategory":"EducationalApplication","operatingSystem":"All",
+     "description":"Adaptive AI quiz generator for topics and documents.",
+     "featureList":["Bayesian Knowledge Tracing mastery model","SM-2 spaced repetition","Hybrid local retrieval for long documents","Confidence calibration","Prerequisite knowledge graph","Misconception analysis"],
+     "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},
+    {"@type":"LearningResource","name":"Recall adaptive quizzes","learningResourceType":"Quiz","educationalUse":"Practice","interactivityType":"active","isAccessibleForFree":true}
+  ]}
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23c9dbff'/%3E%3Cstop offset='1' stop-color='%234a78e8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='%230d1638'/%3E%3Cpath d='M9 22V10h7a4 4 0 0 1 0 8h-7m6 0 5 4' fill='none' stroke='url(%23g)' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +31,7 @@
   <link rel="stylesheet" href="static/styles.css">
 </head>
 <body>
+<a class="skip" href="#main-content">Skip to content</a>
 <div class="shell" id="shell">
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar" id="sidebar">
@@ -20,11 +40,12 @@
       <span>Recall</span>
     </a>
 
-    <nav class="nav" aria-label="Main">
+    <nav class="nav" aria-label="Primary">
       <a href="#/" data-nav="home" class="active"><i data-i="home"></i>Home</a>
       <a href="#/" data-nav="topic"><i data-i="globe"></i>Topic quiz</a>
       <a href="#/" data-nav="docs"><i data-i="file"></i>From documents</a>
       <a href="#/history" data-nav="history"><i data-i="clock"></i>History</a>
+      <a href="#/insights" data-nav="insights"><i data-i="chart"></i>Insights<span class="badge" id="dueBadge" hidden>0</span></a>
       <a href="#/" data-nav="settings"><i data-i="gear"></i>Settings</a>
     </nav>
 
@@ -47,7 +68,7 @@
   </aside>
 
   <!-- ============ MAIN ============ -->
-  <main class="main">
+  <main class="main" id="main-content">
     <header class="topbar">
       <button class="icon-btn burger" id="burger" aria-label="Menu"><i data-i="menu"></i></button>
       <label class="search">
@@ -132,8 +153,18 @@
               </select>
             </label>
           </div>
+          <label class="pop-toggle"><span><b>Adapt to me</b><br><span class="muted">Difficulty and focus follow your mastery</span></span>
+            <span class="switch"><input type="checkbox" id="adaptToggle"><span class="track"><span class="thumb"></span></span></span></label>
+          <label class="pop-toggle"><span><b>Ask how sure I am</b><br><span class="muted">Guess / Unsure / Sure on each answer</span></span>
+            <span class="switch"><input type="checkbox" id="confToggle" checked><span class="track"><span class="thumb"></span></span></span></label>
           <button class="btn primary full" id="mixDone">Done</button>
         </div>
+      </div>
+
+      <div class="due-card glass" id="dueCard" hidden>
+        <i data-i="brain"></i>
+        <div><b id="dueText">Questions due for review</b><br><span class="muted">Spaced repetition: instant, works offline.</span></div>
+        <button class="btn primary sm" id="reviseBtn" type="button">Start revision</button>
       </div>
 
       <div class="suggest" id="suggest">
@@ -197,6 +228,9 @@
 
     <!-- ---------- HISTORY VIEW ---------- -->
     <section class="view" id="view-history" hidden></section>
+
+    <!-- ---------- INSIGHTS VIEW ---------- -->
+    <section class="view wide" id="view-insights" hidden></section>
   </main>
 </div>
 
@@ -224,6 +258,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="static/learning.js"></script>
 <script src="static/app.js"></script>
+<script src="static/insights.js"></script>
 </body>
 </html>
