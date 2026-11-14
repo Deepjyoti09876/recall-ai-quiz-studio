@@ -115,5 +115,13 @@ function runLearningTests(L, check) {
   fresh();
   L.recordAttempt({ item: { type: "short", question: "Teach back: Paging", concept: "Paging", bloom: "Create" }, correct: true, kind: "teachback" });
   check("teach-back updates mastery but creates no review card", L.state().concepts.paging.n === 1 && Object.keys(L.state().cards).length === 0);
+
+  // --- sample data for demos
+  fresh();
+  check("loadSample fills an empty profile", L.loadSample() === true && Object.keys(L.state().concepts).length === 5 && L.state().sessions.length >= 2
+    && L.dueCards().length >= 1 && L.state().graph.edges.length >= 3, L.state ? Object.keys(L.state().concepts).length : 0);
+  const n = L.state().attempts.length;
+  check("loadSample never overwrites existing data", L.loadSample() === false && L.state().attempts.length === n);
+  check("sample data has weak and strong concepts", L.conceptList().some((c) => c.pL < 0.4) && L.conceptList().some((c) => c.pL >= 0.8));
 }
 if (typeof module !== "undefined") module.exports = runLearningTests;

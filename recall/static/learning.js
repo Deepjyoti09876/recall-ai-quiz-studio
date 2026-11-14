@@ -415,8 +415,33 @@
     return { n: rows.length, brier: rows.length ? brier / rows.length : null, quads, levels: lv };
   }
 
+  /* Demo profile: five linked concepts with a mix of weak and strong results. Never overwrites real data. */
+  function loadSample() {
+    const s = S();
+    if (s.attempts.length || Object.values(s.concepts).some((c) => c.n > 0)) return false;
+    mergeGraph([{ name: "Recursion", prereqs: [] }, { name: "Binary Search Tree", prereqs: ["Recursion"] },
+      { name: "Tree Traversal", prereqs: ["Recursion", "Binary Search Tree"] }, { name: "Balancing", prereqs: ["Binary Search Tree"] },
+      { name: "Big O", prereqs: [] }], "Sample data");
+    const plan = { "Recursion": [1, 1, 1, 1, 1, 1], "Big O": [1, 1, 0, 1, 1], "Binary Search Tree": [0, 1, 0, 0],
+      "Tree Traversal": [0, 0, 1, 0, 0], "Balancing": [0, 0] };
+    const confs = ["sure", "unsure", "guess", null], levels = ["Remember", "Understand", "Apply", "Analyze"];
+    let k = 0;
+    const made = [];
+    Object.entries(plan).forEach(([concept, results]) => results.forEach((ok, i) => {
+      const item = { type: "mcq", question: `${concept}: sample question ${i + 1}`, options: ["a", "b", "c", "d"], answer_index: 0, concept,
+        bloom: levels[k % 4], misconceptions: [null, `Typical mix-up in ${concept}`, null, null] };
+      const ms = k === 3 ? 1500 : 5000 + ((k * 1700) % 14000);
+      made.push(recordAttempt({ item, correct: !!ok, conf: confs[k % 4], misc: ok ? null : `Typical mix-up in ${concept}`, kind: "quiz", ms, hints: k % 7 === 0 ? 1 : 0 }));
+      k++;
+    }));
+    [2, 3, 2, 4, 3, 4].forEach((right, i) => recordSession({ id: "sample" + i, title: "Sample quiz " + (i + 1), kind: "quiz", total: 4, correct: right,
+      attempts: made.slice(i * 4, i * 4 + 4).filter(Boolean) }));
+    save(true);
+    return true;
+  }
+
   const L = {
-    KEY, CAPS, P_INIT, empty, load, save, reset, importJSON, exportJSON, state: S,
+    loadSample, KEY, CAPS, P_INIT, empty, load, save, reset, importJSON, exportJSON, state: S,
     qid, band, keyOf, normalizeQuiz, bktUpdate, quality, sm2Update, ensureConcept, mergeGraph, reaches,
     recordAttempt, recordSession, dueCards, cardsForConcept, conceptList, vocab, upstream,
     behaviour, isRushed, readinessAt, setExam, plan, planToday, BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },

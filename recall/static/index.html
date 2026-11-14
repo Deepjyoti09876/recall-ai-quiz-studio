@@ -41,9 +41,7 @@
     </a>
 
     <nav class="nav" aria-label="Primary">
-      <a href="#/" data-nav="home" class="active"><i data-i="home"></i>Home</a>
-      <a href="#/" data-nav="topic"><i data-i="globe"></i>Topic quiz</a>
-      <a href="#/" data-nav="docs"><i data-i="file"></i>From documents</a>
+      <a href="#/" data-nav="home" class="active"><i data-i="plus"></i>Create</a>
       <a href="#/history" data-nav="history"><i data-i="clock"></i>History</a>
       <a href="#/insights" data-nav="insights"><i data-i="chart"></i>Insights<span class="badge" id="dueBadge" hidden>0</span></a>
       <a href="#/" data-nav="settings"><i data-i="gear"></i>Settings</a>
@@ -171,6 +169,11 @@
         <span class="muted">Not sure where to start?</span>
       </div>
 
+      <div class="adapt-hint">
+        <button class="chip-btn" id="adaptChip" type="button" aria-pressed="false">Adapt to me</button>
+        <span class="muted">Follows your mastery. Hints, spaced review and an exam planner are in Insights.</span>
+      </div>
+
       <!-- engine and capabilities: one quiet line instead of a dashboard rail -->
       <div class="status-line">
         <label class="engine-pick">
@@ -238,12 +241,15 @@
 <dialog class="modal" id="settingsModal">
   <form method="dialog">
     <h2>Settings</h2>
-    <label class="field">Your name<input id="nameInput" maxlength="30" placeholder="Deepjyoti"></label>
+    <label class="field">Your name<input id="nameInput" maxlength="30" placeholder="Your name"></label>
     <label class="field">Default AI engine<select id="engineSelect2" class="mini-select full"></select></label>
     <label class="field">Server address <span class="muted">(leave empty when running locally)</span><input id="apiInput" placeholder="http://localhost:8000"></label>
     <div class="modal-actions">
-      <button class="btn ghost" value="clear" id="clearHistory" type="button">Clear history</button>
       <button class="btn primary" value="save" id="saveSettings">Save</button>
+    </div>
+    <div class="danger-zone" id="dangerZone">
+      <span class="muted">Danger zone</span>
+      <button class="btn ghost danger" value="clear" id="clearHistory" type="button">Clear history</button>
     </div>
   </form>
 </dialog>

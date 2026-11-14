@@ -115,10 +115,15 @@
     const strong = tried.filter((c) => c.pL >= 0.8).reverse();
 
     if (!tried.length && !st.sessions.length) {
-      container.innerHTML = `<div class="rev-head"><h2>Insights</h2></div>
-        <div class="empty-state">${UI().ico("chart")}<p>No learning data yet. Finish a quiz and Recall will track mastery, schedule reviews and map your concepts.</p></div>`;
+      container.classList.remove("wide");  // same column as the other pages
+      container.innerHTML = `<div class="rev-head"><h2>Insights</h2></div>` + UI().emptyState("chart",
+        "Finish a quiz and Insights fills with your mastery per concept, the reviews that are due, a concept graph and an exam plan.",
+        `<button class="btn primary" data-nav="home">${UI().ico("plus")}Make a quiz</button>
+         <button class="btn" data-ins="sample">${UI().ico("spark")}Try with sample data</button>`);
+      wire(container);
       return;
     }
+    container.classList.add("wide");
 
     const dueByConcept = {};
     due.forEach((c) => { dueByConcept[c.concept] = (dueByConcept[c.concept] || 0) + 1; });
@@ -259,6 +264,10 @@
       else if (a === "teach") UI().openTeachBack(b.dataset.c);
       else if (a === "adaptive") UI().adaptiveNext();
       else if (a === "revise") UI().startRevision();
+      else if (a === "sample") {
+        if (LR.loadSample()) { UI().renderDue(); render(container); UI().toast("Sample data loaded. Reset on this page clears it."); }
+        else UI().toast("You already have learning data, so nothing was changed.", true);
+      }
       else if (a === "plan-today") UI().startRevision(LR.planToday());
       else if (a === "exam-clear") { LR.setExam(0, 15); render(container); }
       else if (a === "exam-save") {

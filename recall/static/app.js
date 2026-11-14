@@ -131,7 +131,8 @@
     if (view !== "quiz") stopTimer();
   }
   function setNav(key) {
-    $$(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.nav === key));
+    const k = key === "topic" || key === "docs" ? "home" : key;  // the topic and document tabs both live on Create
+    $$(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.nav === k));
   }
 
   /* ---------------- composer ---------------- */
@@ -156,6 +157,7 @@
     $("#depthSelect").value = st.depth;
     $("#webToggle").checked = st.use_web;
     $("#adaptToggle").checked = !!st.adaptive;
+    $("#adaptChip").setAttribute("aria-pressed", String(!!st.adaptive));
     $("#confToggle").checked = st.askConf !== false;
     const parts = [];
     if (st.n_mcq) parts.push(`${st.n_mcq} MCQ`);
@@ -951,12 +953,16 @@
         <div class="hi-main"><div class="hi-title">${esc(h.title)}</div><div class="hi-sub">${ago(h.date)}, ${h.count} questions, ${esc(h.difficulty.toLowerCase())}, ${esc(h.mode.toLowerCase())}</div></div>
         <div class="hi-score">${h.total ? Math.round(100 * h.right / h.total) + "%" : "—"}</div>
         <button class="btn sm" data-hist="${esc(h.id)}">${ico("replay")}Retake</button></div>`).join("")}</div>`
-        : `<div class="empty-state">${ico("clock")}<p>No quizzes yet. Pick a topic on the home screen to start.</p></div>`);
+        : emptyState("clock", "No quizzes yet. Make one and it will be listed here, ready to retake.", `<button class="btn primary" data-nav="home">${ico("plus")}Make a quiz</button>`));
   }
   function retakeFromHistory(id) {
     const h = store.get("history", []).find((x) => x.id === id);
     if (!h) return;
     startQuiz({ quiz: h.quiz, title: h.title, source: h.source, sources: h.sources, difficulty: h.difficulty, mode: h.mode, timer: h.timer, historyId: h.id });
+  }
+  /* one empty-state layout for every screen: icon, sentence, buttons, centred in the column */
+  function emptyState(icon, text, buttons = "") {
+    return `<div class="empty-state centered">${ico(icon)}<p>${esc(text)}</p>${buttons ? `<div class="row-actions">${buttons}</div>` : ""}</div>`;
   }
   function renderStats() {
     const hist = store.get("history", []);
@@ -966,12 +972,14 @@
     $("#statAvg").textContent = scored.length ? Math.round(scored.reduce((a, h) => a + (100 * h.right) / h.total, 0) / scored.length) + "%" : "—";
     const pts = scored.slice(0, 12).reverse().map((h) => (100 * h.right) / h.total);
     const svg = $("#sparkline");
-    const data = pts.length >= 2 ? pts : [40, 55, 48, 62, 58, 70, 66, 78];
+    svg.toggleAttribute("hidden", pts.length < 2);  // no chart until there is a real trend to show
+    if (pts.length < 2) { svg.innerHTML = ""; return; }
+    const data = pts;
     const w = 260, hgt = 50, step = w / (data.length - 1);
     const xy = data.map((v, i) => [i * step, hgt - (v / 100) * (hgt - 6) + 2]);
     const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     svg.innerHTML = `<defs><linearGradient id="spk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#839ff8" stop-opacity=".45"/><stop offset="1" stop-color="#839ff8" stop-opacity="0"/></linearGradient></defs>
-      <path d="${line} L${w},56 L0,56 Z" fill="url(#spk)"/><path d="${line}" fill="none" stroke="#839ff8" stroke-width="2" style="filter:drop-shadow(0 0 4px #4f6ef7)" opacity="${pts.length >= 2 ? 1 : .35}"/>`;
+      <path d="${line} L${w},56 L0,56 Z" fill="url(#spk)"/><path d="${line}" fill="none" stroke="#839ff8" stroke-width="2" style="filter:drop-shadow(0 0 4px #4f6ef7)" />`;
   }
 
   /* ---------------- server status / engines ---------------- */
@@ -1094,7 +1102,8 @@
     $("#timerSelect").onchange = (e) => { S.settings.timer = +e.target.value; saveSettings(); };
     $("#depthSelect").onchange = (e) => { S.settings.depth = e.target.value; saveSettings(); };
     $("#webToggle").onchange = (e) => { S.settings.use_web = e.target.checked; saveSettings(); };
-    $("#adaptToggle").onchange = (e) => { S.settings.adaptive = e.target.checked; saveSettings(); toast(e.target.checked ? "Adapting to you: difficulty and focus follow your mastery." : "Adaptive mode off."); };
+    $("#adaptChip").onclick = () => { S.settings.adaptive = !S.settings.adaptive; saveSettings(); syncControls(); toast(S.settings.adaptive ? "Adapting to you: difficulty and focus follow your mastery." : "Adaptive mode off."); };
+    $("#adaptToggle").onchange = (e) => { S.settings.adaptive = e.target.checked; saveSettings(); syncControls(); toast(e.target.checked ? "Adapting to you: difficulty and focus follow your mastery." : "Adaptive mode off."); };
     $("#confToggle").onchange = (e) => { S.settings.askConf = e.target.checked; saveSettings(); };
     $("#reviseBtn").onclick = () => startRevision();
     $("#teachGo").onclick = submitTeachBack;
@@ -1172,7 +1181,7 @@
   }
 
   /* ---------------- boot ---------------- */
-  window.RecallUI = { $, $$, esc, ico, toast, ask, show, download, openTeachBack, startRevision, practiceConcept, adaptiveNext, renderDue };
+  window.RecallUI = { $, $$, esc, ico, toast, ask, show, download, emptyState, renderStats, openTeachBack, startRevision, practiceConcept, adaptiveNext, renderDue };
   LR.load();
   LR.onError(() => toast("Browser storage is full: older learning data was trimmed.", true));
   hydrate();
