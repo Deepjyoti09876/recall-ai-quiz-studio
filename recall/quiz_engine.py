@@ -536,6 +536,35 @@ def _clean_grade(g, key_points) -> dict:
 MAX_BATCH = 6
 
 
+def grade_teachback(concept: str, explanation: str, reference: list[str], engine="auto") -> dict:
+    """Judge a learner's own explanation of a concept against material they studied (one model call)."""
+    ref = "\n".join(f"- {str(r)[:300]}" for r in (reference or [])[:5]) or "- (no reference material stored)"
+    prompt = (f"A student explains the concept \"{concept}\" as if teaching a classmate.\n\n"
+              f"Reference material the student studied:\n{ref}\n\nStudent explanation:\n{str(explanation)[:2000]}\n\n"
+              "Judge accuracy and completeness. Credit correct ideas even when the wording differs. "
+              'Return a JSON object: {"score": 0-100, "covered": [str], "missing": [str], '
+              '"misconception": str or null (null if the explanation holds no wrong belief), '
+              '"follow_up": one question a curious classmate would ask next}.')
+    fallback = {"score": 0, "covered": [], "missing": [], "misconception": None, "follow_up": "",
+                "feedback": "Could not check the explanation automatically. Compare it with your notes."}
+    try:
+        g = _grade_call(prompt, GRADING_SYSTEM, engine, timeout=40)
+        if not isinstance(g, dict):
+            return fallback
+        try:
+            score = max(0, min(100, int(float(g.get("score", 0)))))
+        except (TypeError, ValueError):
+            score = 0
+        mis = g.get("misconception")
+        return {"score": score,
+                "covered": [str(x)[:200] for x in (g.get("covered") or []) if x][:8],
+                "missing": [str(x)[:200] for x in (g.get("missing") or []) if x][:8],
+                "misconception": str(mis)[:240] if mis and str(mis).lower() != "null" else None,
+                "follow_up": str(g.get("follow_up") or "")[:240], "feedback": ""}
+    except Exception:
+        return fallback
+
+
 def grade_short_batch(items: list[dict], engine="auto") -> list[dict]:
     """Grade several written answers with ONE model call. items: [{answer, model_answer, key_points}].
 

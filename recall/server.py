@@ -8,6 +8,7 @@ Serves the website in /static and a small JSON API:
   POST /api/quiz/document    quiz from uploaded files and/or pasted text
   POST /api/grade            AI grading of a short answer
   POST /api/grade/batch      grade up to 6 written answers with one model call
+  POST /api/teachback        judge a learner's own explanation of a concept
   POST /api/run              run code against test cases (Python sandbox)
   POST /api/export/markdown  quiz -> Markdown text
   GET  /robots.txt /sitemap.xml /llms.txt /manifest.webmanifest   crawler + install metadata
@@ -35,6 +36,7 @@ from .quiz_engine import (
     get_available_engines,
     grade_short_answer,
     grade_short_batch,
+    grade_teachback,
     to_markdown,
 )
 from .sandbox import run_tests
@@ -175,6 +177,19 @@ def grade_batch():
     if not items:
         return _error("No written answers to grade.")
     return jsonify({"grades": grade_short_batch(items, engine=d.get("engine", "auto"))})
+
+
+@app.post("/api/teachback")
+def teachback():
+    d = request.get_json(silent=True) or {}
+    concept = _clean_name(d.get("concept"))
+    text = str(d.get("explanation", "")).strip()
+    if not concept:
+        return _error("Pick a concept to explain.")
+    if len(text) < 20:
+        return _error("Write at least a couple of sentences.")
+    ref = [str(r) for r in (d.get("reference") or []) if isinstance(r, str)][:5]
+    return jsonify(grade_teachback(concept, text, ref, engine=d.get("engine", "auto")))
 
 
 @app.post("/api/run")

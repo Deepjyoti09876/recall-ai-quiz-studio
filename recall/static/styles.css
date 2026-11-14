@@ -466,3 +466,8 @@ pre.code { margin: 8px 0 0; padding: 14px 16px; border-radius: 10px; background:
 .hint-note { padding: 10px 14px; border-radius: var(--r-ctl); background: var(--panel); border: 1px solid var(--line-hi); color: var(--ink-2); font-size: .92rem; line-height: 1.5; }
 .hint-row kbd { font-family: var(--mono); font-size: .68rem; opacity: .55; margin-left: 4px; }
 .habits { margin: 0; }
+
+/* ---- teach-back ---- */
+.modal.teach { width: min(640px, 94vw); }
+.modal.teach .answer-box { width: 100%; }
+#teachResult .feedback { margin-top: 14px; }

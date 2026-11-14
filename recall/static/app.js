@@ -410,6 +410,71 @@
     wireQuestion(i, q);
   }
 
+  /* ---------------- teach-back ---------------- */
+  let teachConcept = "", rec = null;
+  function referenceFor(name) {  // what the learner studied about this concept, taken from their stored questions
+    const out = [];
+    LR.cardsForConcept(name).forEach((c) => {
+      const it = c.item || {};
+      if (it.type === "mcq" && it.explanation) out.push(`${it.question} ${it.options[it.answer_index]}. ${it.explanation}`);
+      else if (it.type === "short") out.push(`${it.question} ${it.model_answer}`);
+    });
+    const z = S.quiz;
+    if (!out.length && z) z.items.filter((q) => q.concept === name).forEach((q) => {
+      if (q.type === "mcq" && q.explanation) out.push(`${q.question} ${q.options[q.answer_index]}. ${q.explanation}`);
+      else if (q.type === "short") out.push(`${q.question} ${q.model_answer}`);
+    });
+    return out.slice(0, 5);
+  }
+  function openTeachBack(name) {
+    if (S.demo) { toast("Start the local server to use teach-back.", true); return; }
+    teachConcept = name;
+    $("#teachTitle").textContent = `Teach it back: ${name}`;
+    $("#teachText").value = "";
+    $("#teachResult").innerHTML = "";
+    $("#teachStatus").textContent = "";
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    $("#teachMic").hidden = !SR;
+    $("#teachModal").showModal();
+    $("#teachText").focus();
+  }
+  function toggleMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    if (rec) { rec.stop(); return; }
+    rec = new SR();
+    rec.lang = navigator.language || "en-US"; rec.interimResults = false; rec.continuous = true;
+    const box = $("#teachText"), base = box.value ? box.value.trim() + " " : "";
+    let heard = "";
+    rec.onresult = (e) => { heard = [...e.results].map((r) => r[0].transcript).join(" "); box.value = base + heard; };
+    rec.onerror = () => { $("#teachStatus").textContent = "Voice input isn't available in this browser. Type instead."; };
+    rec.onend = () => { rec = null; $("#teachMic").textContent = "Speak"; if (!$("#teachStatus").textContent) $("#teachStatus").textContent = ""; };
+    $("#teachMic").textContent = "Stop";
+    $("#teachStatus").textContent = "Listening…";
+    rec.start();
+  }
+  async function submitTeachBack() {
+    const text = $("#teachText").value.trim();
+    if (text.length < 20) { $("#teachStatus").textContent = "Write at least a couple of sentences."; return; }
+    $("#teachStatus").textContent = "Checking…";
+    $("#teachGo").disabled = true;
+    try {
+      const g = await api("/api/teachback", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ concept: teachConcept, explanation: text, reference: referenceFor(teachConcept), engine: S.settings.engine }) });
+      const ok = g.score >= 70;
+      $("#teachResult").innerHTML = `<div class="feedback ${ok ? "ok" : "bad"}"><b class="h">${ico(ok ? "check" : "info")}Score: ${g.score}%</b>${esc(g.feedback || "")}
+        ${(g.covered || []).length || (g.missing || []).length ? `<ul class="kp">${(g.covered || []).map((h) => `<li class="hit">${ico("check")}${esc(h)}</li>`).join("")}${(g.missing || []).map((m) => `<li class="miss">${ico("x")}${esc(m)}</li>`).join("")}</ul>` : ""}
+        ${g.misconception ? `<div class="misc-note"><b>Possible misconception:</b> ${esc(g.misconception)}</div>` : ""}
+        ${g.follow_up ? `<p class="muted note">A classmate might ask: ${esc(g.follow_up)}</p>` : ""}</div>`;
+      if (!g.feedback || g.score > 0 || (g.covered || []).length || (g.missing || []).length) {
+        LR.recordAttempt({ item: { type: "short", question: "Teach back: " + teachConcept, concept: teachConcept, bloom: "Create" }, correct: ok, misc: g.misconception || null, kind: "teachback" });
+        LR.save(true); renderDue();
+      }
+      $("#teachStatus").textContent = "";
+    } catch (e) { $("#teachStatus").textContent = e.message || "Could not check the explanation."; }
+    $("#teachGo").disabled = false;
+  }
+
   /* ---------------- hints and response time ---------------- */
   function hintUI(i, q, z, practice) {
     const hs = q.hints || [];
@@ -705,7 +770,8 @@
           return `<div class="mistake"><div class="m-head"><b>${esc(n)}</b>${masteryBar(pl)}</div>
             ${groups[n].misc.length ? `<ul class="kp">${groups[n].misc.map((m) => `<li class="miss">${ico("x")}${esc(m)}</li>`).join("")}</ul>` : ""}
             <div class="row-actions">${can ? `<button class="btn sm" data-act="redrill" data-concept="${esc(n)}">${ico("replay")}Re-drill offline (${can})</button>` : ""}
-            ${S.demo ? "" : `<button class="btn sm" data-act="practice" data-concept="${esc(n)}">${ico("spark")}New questions on this</button>`}</div></div>`;
+            ${S.demo ? "" : `<button class="btn sm" data-act="practice" data-concept="${esc(n)}">${ico("spark")}New questions on this</button>
+            <button class="btn sm" data-act="teach" data-concept="${esc(n)}">${ico("pen")}Teach it back</button>`}</div></div>`;
         }).join("")}</section>`;
     }
     return html;
@@ -792,6 +858,7 @@
     if (act === "gradebatch") return gradeBatch();
     if (act === "revise") return startRevision();
     if (act === "adaptive") return adaptiveNext();
+    if (act === "teach") return openTeachBack(el.dataset.concept);
     if (act === "redrill") return redrill(el.dataset.concept);
     if (act === "practice") return practiceConcept(el.dataset.concept);
     if (act === "retry") {
@@ -1030,6 +1097,9 @@
     $("#adaptToggle").onchange = (e) => { S.settings.adaptive = e.target.checked; saveSettings(); toast(e.target.checked ? "Adapting to you: difficulty and focus follow your mastery." : "Adaptive mode off."); };
     $("#confToggle").onchange = (e) => { S.settings.askConf = e.target.checked; saveSettings(); };
     $("#reviseBtn").onclick = () => startRevision();
+    $("#teachGo").onclick = submitTeachBack;
+    $("#teachMic").onclick = toggleMic;
+    $("#teachClose").onclick = () => { if (rec) rec.stop(); $("#teachModal").close(); };
     $("#engineSelect").onchange = (e) => { S.settings.engine = e.target.value; saveSettings(); updateEngineCard(); };
 
     // files
@@ -1102,7 +1172,7 @@
   }
 
   /* ---------------- boot ---------------- */
-  window.RecallUI = { $, $$, esc, ico, toast, ask, show, download, startRevision, practiceConcept, adaptiveNext, renderDue };
+  window.RecallUI = { $, $$, esc, ico, toast, ask, show, download, openTeachBack, startRevision, practiceConcept, adaptiveNext, renderDue };
   LR.load();
   LR.onError(() => toast("Browser storage is full: older learning data was trimmed.", true));
   hydrate();

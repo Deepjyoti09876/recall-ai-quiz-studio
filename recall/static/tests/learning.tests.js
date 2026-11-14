@@ -110,5 +110,10 @@ function runLearningTests(L, check) {
   L.recordAttempt({ item: { type: "short", question: "fast", concept: "Paging", options: [], answer_index: 0 }, correct: false, ms: 5000, kind: "quiz" });
   const bh = L.behaviour();
   check("behaviour summary", bh.rushed === 1 && bh.rushedWrong === 1 && bh.hints === 2 && bh.hintsByConcept.Paging === 2 && bh.medRight === 40000, bh);
+
+  // --- teach-back
+  fresh();
+  L.recordAttempt({ item: { type: "short", question: "Teach back: Paging", concept: "Paging", bloom: "Create" }, correct: true, kind: "teachback" });
+  check("teach-back updates mastery but creates no review card", L.state().concepts.paging.n === 1 && Object.keys(L.state().cards).length === 0);
 }
 if (typeof module !== "undefined") module.exports = runLearningTests;

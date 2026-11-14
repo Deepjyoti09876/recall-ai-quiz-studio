@@ -127,3 +127,27 @@ def test_hints_validated():
                      "short": [{"question": "c", "model_answer": "m", "hints": ["only one"]}]})
     assert v["mcq"][0]["hints"] == ["nudge", "more"] and v["mcq"][1]["hints"] == [] and v["short"][0]["hints"] == ["only one"]
     assert q.build_prompt("t", "Easy", 1, 1, 0, "Python").count("never states the answer") == 1
+
+
+def test_teachback_parsing_and_fallback(monkeypatch):
+    monkeypatch.setattr(q, "_grade_call", lambda *a, **k: {"score": "72", "covered": ["a", ""], "missing": ["b"], "misconception": "null", "follow_up": "Why?"})
+    g = q.grade_teachback("Paging", "Paging splits memory into fixed pages.", ["ref"])
+    assert g["score"] == 72 and g["covered"] == ["a"] and g["misconception"] is None and g["follow_up"] == "Why?"
+    monkeypatch.setattr(q, "_grade_call", lambda *a, **k: {"score": 500, "misconception": "Thinks pages are variable size"})
+    g = q.grade_teachback("Paging", "x" * 30, [])
+    assert g["score"] == 100 and g["misconception"] == "Thinks pages are variable size"
+    def boom(*a, **k):
+        raise RuntimeError("down")
+    monkeypatch.setattr(q, "_grade_call", boom)
+    assert q.grade_teachback("Paging", "x" * 30, [])["score"] == 0
+
+
+def test_teachback_endpoint(monkeypatch):
+    import recall.server as srv
+    seen = {}
+    monkeypatch.setattr(srv, "grade_teachback", lambda c, e, r, engine="auto": seen.update(c=c, r=r) or {"score": 80})
+    c = app.test_client()
+    assert c.post("/api/teachback", json={"concept": "", "explanation": "x" * 40}).status_code == 400
+    assert c.post("/api/teachback", json={"concept": "Paging", "explanation": "short"}).status_code == 400
+    r = c.post("/api/teachback", json={"concept": " Paging. ", "explanation": "x" * 40, "reference": ["a", 5, "b"] + ["c"] * 10})
+    assert r.status_code == 200 and seen["c"] == "Paging" and seen["r"][:2] == ["a", "b"] and len(seen["r"]) == 5

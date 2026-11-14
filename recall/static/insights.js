@@ -142,7 +142,8 @@
       ${top ? `<section class="panel-block glass root-cause" aria-label="Recommended next"><div class="panel-title">${UI().ico("target")} Recommended next</div>
         <p><b>${esc(top.name)}</b> <span class="muted">· ${esc(top.reason)} · mastery ${pct(top.pL)}%</span></p>
         <div class="row-actions"><button class="btn primary sm" data-ins="practice" data-c="${esc(top.name)}">${UI().ico("spark")}Practice this concept</button>
-        <button class="btn sm" data-ins="adaptive">${UI().ico("brain")}Adaptive quiz</button></div></section>` : ""}
+        <button class="btn sm" data-ins="adaptive">${UI().ico("brain")}Adaptive quiz</button>
+        <button class="btn sm" data-ins="teach" data-c="${esc(top.name)}">${UI().ico("pen")}Teach it back</button></div></section>` : ""}
 
       <section class="panel-block glass" aria-label="Spaced repetition"><div class="panel-title">${UI().ico("clock")} Spaced repetition</div>
         ${due.length ? `<p>${due.length} question${due.length > 1 ? "s" : ""} due: ${Object.entries(dueByConcept).slice(0, 6).map(([c, n]) => `${esc(c)} (${n})`).join(", ")}</p>
@@ -242,7 +243,8 @@
           const pre = st.graph.edges.filter(([, b]) => b === k).map(([a]) => (st.concepts[a] || {}).name || a);
           side.innerHTML = `<b>${esc(c.name)}</b> · mastery ${pct(c.pL)}% (${LR.band(c.pL)}) · ${c.n} attempt${c.n === 1 ? "" : "s"} · ${LR.cardsForConcept(c.name).length} cards
             ${pre.length ? `<br><span class="muted">Needs: ${pre.map(esc).join(", ")}</span>` : ""}
-            <div class="row-actions"><button class="btn primary sm" data-ins="practice" data-c="${esc(c.name)}">${UI().ico("spark")}Practice concept</button></div>`;
+            <div class="row-actions"><button class="btn primary sm" data-ins="practice" data-c="${esc(c.name)}">${UI().ico("spark")}Practice concept</button>
+              <button class="btn sm" data-ins="teach" data-c="${esc(c.name)}">${UI().ico("pen")}Teach it back</button></div>`;
         });
       });
     }
@@ -254,6 +256,7 @@
       if (!b) return;
       const a = b.dataset.ins;
       if (a === "practice") UI().practiceConcept(b.dataset.c);
+      else if (a === "teach") UI().openTeachBack(b.dataset.c);
       else if (a === "adaptive") UI().adaptiveNext();
       else if (a === "revise") UI().startRevision();
       else if (a === "plan-today") UI().startRevision(LR.planToday());

@@ -234,7 +234,7 @@
     const bl = (c.bloom = c.bloom || {})[lvl] = c.bloom[lvl] || [0, 0];
     bl[0]++; if (a.correct) bl[1]++;
     c.last = now;
-    if (a.kind !== "retry") {
+    if (a.kind !== "retry" && a.kind !== "teachback") {  // re-drills and teach-backs do not change the review schedule
       let card = s.cards[id];
       if (!card) card = s.cards[id] = { qid: id, concept, ef: 2.5, interval: 0, reps: 0, lapses: 0, due: now, last: now, item: snapshot(item) };
       else card.item = snapshot(item);

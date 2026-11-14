@@ -248,6 +248,18 @@
   </form>
 </dialog>
 
+<dialog class="modal teach" id="teachModal">
+  <h2 id="teachTitle">Teach it back</h2>
+  <p class="muted">Explain it in your own words, as if teaching a classmate. Recall checks it against the material you studied.</p>
+  <textarea id="teachText" class="answer-box" rows="6" maxlength="2000" placeholder="Start with the main idea, then an example…"></textarea>
+  <div class="row-actions"><button class="btn ghost sm" id="teachMic" type="button" hidden>Speak</button><span class="muted" id="teachStatus"></span></div>
+  <div id="teachResult" aria-live="polite"></div>
+  <div class="modal-actions">
+    <button class="btn ghost" id="teachClose" type="button">Close</button>
+    <button class="btn primary" id="teachGo" type="button">Check my explanation</button>
+  </div>
+</dialog>
+
 <dialog class="modal" id="confirmModal">
   <h2 id="confirmText">Are you sure?</h2>
   <div class="modal-actions">
