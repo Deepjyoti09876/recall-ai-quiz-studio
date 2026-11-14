@@ -346,7 +346,7 @@
     }).join("");
 
     let body = `<span class="qtype">${ico(q.type === "mcq" ? "list" : q.type === "short" ? "pen" : "code")}${TYPE_LABEL[q.type]}</span>
-      ${q.concept && q.concept !== "General" ? `<span class="concept-chip">${esc(q.concept)}</span>` : ""}
+      ${q.concept && q.concept !== "General" ? `<span class="concept-chip">${esc(q.concept)}</span>` : ""}${evBadge(q)}
       <div class="qtext">${esc(q.question)}</div>`;
     const showConf = S.settings.askConf !== false && q.type !== "coding";
     const awaiting = practice && z.awaiting === i && q.type === "mcq" && !z.revealed[i];
@@ -371,6 +371,7 @@
         body += `<div class="feedback ${ok ? "ok" : "bad"}"><b class="h">${ico(ok ? "check" : "x")}${ok ? "Correct." : "Not quite."}</b>
           ${ok ? "" : `The answer is <b>${esc(correctText(q))}</b>. `}${esc(q.explanation || "")}
           ${q.source_quote ? `<div class="quote">“${esc(q.source_quote)}”</div>` : ""}</div>`;
+        body += evidenceBlock(q);
         const mis = !ok && (q.misconceptions || [])[q.options.indexOf(picked)];
         if (mis) body += `<div class="misc-note" aria-live="polite"><b>Why this option was tempting:</b> ${esc(mis)}</div>`;
       }
@@ -404,6 +405,20 @@
     $("#flagBtn span").textContent = z.flagged.has(i) ? "Flagged" : "Flag";
     $("#flagBtn").classList.toggle("ok", z.flagged.has(i));
     wireQuestion(i, q);
+  }
+
+  /* ---------------- evidence from the source text ---------------- */
+  const EV_LABEL = { verified: "Verified in source", partial: "Partly supported", unsupported: "Not found in source" };
+  const evBadge = (q) => (q.evidence && EV_LABEL[q.evidence.status] ? `<span class="ev-badge ev-${q.evidence.status}" title="Checked against your source text">${EV_LABEL[q.evidence.status]}</span>` : "");
+  const evidenceBlock = (q) => (q.evidence && q.evidence.passage
+    ? `<details class="evidence"><summary>Show evidence${q.evidence.heading ? ` (${esc(q.evidence.heading)})` : ""}</summary><p>${esc(q.evidence.passage)}</p></details>` : "");
+  /* Random option order so revision never rewards remembering the answer's position. */
+  function shuffled(q) {
+    if (q.type !== "mcq" || (q.options || []).length !== 4 || q.options.some((o) => /all of the above|none of the above|both [a-d]|a and b|b and c/i.test(o))) return q;
+    const order = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const mis = q.misconceptions || [null, null, null, null];
+    return { ...q, options: order.map((k) => q.options[k]), misconceptions: order.map((k) => mis[k]), answer_index: order.indexOf(q.answer_index) };
   }
 
   function renderGrade(i, q) {
@@ -696,13 +711,13 @@
   function startRevision(list) {
     const cards = (list || LR.dueCards()).slice(0, 15);
     if (!cards.length) { toast("Nothing is due for review right now."); return; }
-    startQuiz({ quiz: {}, items: cards.map((c) => ({ ...c.item, qid: c.qid, concept: c.concept })), title: `Revision · ${cards.length} due`,
+    startQuiz({ quiz: {}, items: cards.map((c) => shuffled({ ...c.item, qid: c.qid, concept: c.concept })), title: `Revision · ${cards.length} due`,
       source: "revision", sources: [], difficulty: "Mixed", mode: "Practice", timer: S.settings.timer, kind: "revision" });
   }
   function redrill(name) {
     const cards = LR.cardsForConcept(name).slice(0, 10);
     if (!cards.length) { toast("No stored questions for this concept yet.", true); return; }
-    startQuiz({ quiz: {}, items: cards.map((c) => ({ ...c.item, qid: c.qid, concept: c.concept })), title: `Re-drill · ${name}`,
+    startQuiz({ quiz: {}, items: cards.map((c) => shuffled({ ...c.item, qid: c.qid, concept: c.concept })), title: `Re-drill · ${name}`,
       source: "revision", sources: [], difficulty: "Mixed", mode: "Practice", timer: S.settings.timer, retry: 1 });
   }
   function renderDue() {
@@ -785,6 +800,7 @@
       if (q.type === "mcq") {
         b += `<span class="k">Your answer</span><p>${a ? esc(a) : "—"}</p>`;
         if (s !== "right") b += `<span class="k">Correct answer</span><p style="color:var(--ok)">${esc(correctText(q))}</p>`;
+        if (q.evidence && q.evidence.passage) b += `<span class="k">Evidence${q.evidence.heading ? ` (${esc(q.evidence.heading)})` : ""}</span><p>${esc(q.evidence.passage)}</p>`;
         const mis = s === "wrong" && (q.misconceptions || [])[q.options.indexOf(a)];
         if (mis) b += `<span class="k">Why it was tempting</span><p>${esc(mis)}</p>`;
         if (q.explanation) b += `<span class="k">Why</span><p>${esc(q.explanation)}</p>`;

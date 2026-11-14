@@ -63,3 +63,15 @@ def test_off_and_stride(monkeypatch):
     rag._INDEX_CACHE.clear()
     out, meta = rag.select_context(text, 3000)
     assert meta["retriever"] == "stride" and 0 < len(out) <= 3000
+
+
+def test_locate_statuses():
+    text = ("## Trees\n\nA binary search tree keeps smaller keys in the left subtree and larger keys in the right subtree. "
+            "Inorder traversal therefore visits keys in sorted order.\n\n## Graphs\n\nDijkstra's algorithm finds shortest paths from one source node.")
+    v = rag.locate(text, "Inorder traversal therefore visits keys in sorted order.")
+    assert v["status"] == "verified" and v["heading"] == "Trees" and "sorted order" in v["passage"]
+    p = rag.locate(text, "traversal visits keys in sorted order of the binary search tree nodes")
+    assert p["status"] in ("verified", "partial") and p["score"] >= 0.5
+    assert rag.locate(text, "Photosynthesis converts light into chemical energy in chloroplasts")["status"] == "unsupported"
+    assert rag.locate(text, "")["status"] == "no_quote"
+    assert rag.locate("", "anything at all here")["status"] == "no_source"

@@ -357,3 +357,46 @@ def select_context(text: str, budget: int, focus: dict | None = None) -> tuple[s
     meta = {"retriever": backend, "chunks_total": n, "chunks_used": len(selected),
             "chars_in": len(text), "chars_out": len(out)}
     return out, meta
+
+
+# ---------------------------------------------------------------- evidence check
+
+def _norm(s: str) -> str:
+    s = re.sub(r"[‘’“”\"'`]", "", s or "")
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def locate(text: str, quote: str) -> dict:
+    """Check that `quote` (a question's source_quote) is supported by `text`.
+
+    Returns {status, score, heading, passage}. status is one of
+    verified (exact or near-exact match), partial (most words found in one chunk),
+    unsupported, no_quote (the model gave none) or no_source (nothing to check against).
+    Pure string work: no model call, no embedding needed.
+    """
+    empty = {"score": 0.0, "heading": "", "passage": ""}
+    if not (text or "").strip():
+        return {"status": "no_source", **empty}
+    nq = _norm(quote)
+    if len(nq) < 8:
+        return {"status": "no_quote", **empty}
+    chunks = _get_index(text, "stride")["chunks"]
+    for c in chunks:
+        low = _norm(c["text"])
+        pos = low.find(nq)
+        if pos >= 0:
+            start = max(0, pos - 80)
+            return {"status": "verified", "score": 1.0, "heading": c["heading"],
+                    "passage": ("…" if start else "") + low[start:start + 300]}
+    qt = set(_tokens(nq))
+    if not qt:
+        return {"status": "no_quote", **empty}
+    best, best_s = None, 0.0
+    for c in chunks:
+        s = len(qt & set(_tokens(c["text"]))) / len(qt)
+        if s > best_s:
+            best, best_s = c, s
+    if best is None:
+        return {"status": "unsupported", **empty}
+    status = "verified" if best_s >= 0.8 else "partial" if best_s >= 0.5 else "unsupported"
+    return {"status": status, "score": round(best_s, 2), "heading": best["heading"], "passage": best["text"][:300]}

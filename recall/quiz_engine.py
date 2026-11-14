@@ -1,6 +1,7 @@
 """Core logic: builds the prompt, calls LLM (Groq Cloud or local Ollama), parses and validates quiz JSON."""
 import json
 import os
+import random
 import re
 import time
 import urllib.request
@@ -175,6 +176,36 @@ def _validate(data: dict) -> dict:
     return {"mcq": mcq, "short": short, "coding": coding, "concepts": concepts}
 
 
+_FIXED_POSITION = re.compile(r"all of the above|none of the above|both [a-d]|a and b|b and c", re.I)
+
+
+def _shuffle_options(q: dict, rng=None) -> dict:
+    """Randomise option order (LLMs favour certain slots) and keep answer_index + misconceptions aligned."""
+    opts = q.get("options") or []
+    if len(opts) != 4 or any(_FIXED_POSITION.search(str(o)) for o in opts):
+        return q
+    rng = rng or random
+    order = list(range(4))
+    rng.shuffle(order)
+    mis = q.get("misconceptions") or [None] * 4
+    q["options"] = [opts[i] for i in order]
+    q["misconceptions"] = [mis[i] for i in order]
+    q["answer_index"] = order.index(q["answer_index"])
+    return q
+
+
+def _finish_quiz(quiz: dict, source: str) -> dict:
+    """Shuffle MCQ options and attach evidence from the source text. Returns grounding counts."""
+    counts = {"verified": 0, "partial": 0, "unsupported": 0}
+    for q in quiz.get("mcq", []):
+        _shuffle_options(q)
+        ev = rag.locate(source, q.get("source_quote", ""))
+        q["evidence"] = ev
+        if ev["status"] in counts:
+            counts[ev["status"]] += 1
+    return counts
+
+
 def _call_groq_llm(prompt: str, model: str = None, system: str = None) -> str:
     """Ultra-fast cloud generation via Groq API (2-3 seconds)."""
     api_key = os.getenv("GROQ_API_KEY") or os.getenv("XAI_API_KEY", "")
@@ -299,9 +330,11 @@ def generate_topic_quiz(topic, difficulty="Medium", n_mcq=5, n_short=3, n_code=0
     use_groq = _use_groq(engine)
     max_chars = context_budget(n_mcq, n_short, n_code, use_groq)
     web_used = bool(material)
+    full_material = material
     material, ctx = rag.select_context(material, max_chars, focus)
     prompt = build_topic_prompt(topic, material, difficulty, n_mcq, n_short, n_code, language, max_chars, focus)
     quiz = _run_prompt(prompt, use_groq, system=TOPIC_SYSTEM)
+    ctx["grounding"] = _finish_quiz(quiz, full_material)
     return {"quiz": quiz, "sources": sources, "web_used": web_used, "context": ctx}
 
 
@@ -425,12 +458,15 @@ def generate_quiz(text, difficulty="Medium", n_mcq=5, n_short=3, n_code=2,
     use_groq = (engine == "groq") or (engine == "auto" and bool(api_key and api_key.startswith("gsk_")))
 
     max_chars = context_budget(n_mcq, n_short, n_code, use_groq)
+    full_text = text
     text, ctx = rag.select_context(text, max_chars, focus)
-    if isinstance(meta, dict):
-        meta.update(ctx)
     prompt = build_prompt(text, difficulty, n_mcq, n_short, n_code, language, max_chars=max_chars, focus=focus)
 
-    return _run_prompt(prompt, use_groq)
+    quiz = _run_prompt(prompt, use_groq)
+    ctx["grounding"] = _finish_quiz(quiz, full_text)
+    if isinstance(meta, dict):
+        meta.update(ctx)
+    return quiz
 
 
 GRADING_SYSTEM = (

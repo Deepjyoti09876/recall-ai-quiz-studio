@@ -80,3 +80,28 @@ def test_grade_batch_endpoint(monkeypatch):
     assert c.post("/api/grade/batch", json={"items": []}).status_code == 400
     r = c.post("/api/grade/batch", json={"items": [{"answer": "x"}, {"answer": "  "}]})
     assert r.status_code == 200 and len(r.json["grades"]) == 1
+
+
+def test_shuffle_keeps_answer_and_misconceptions():
+    import random
+    base = {"options": ["right", "w1", "w2", "w3"], "answer_index": 0, "misconceptions": [None, "m1", "m2", "m3"]}
+    seen = set()
+    for seed in range(30):
+        m = q._shuffle_options(dict(base, options=list(base["options"]), misconceptions=list(base["misconceptions"])), random.Random(seed))
+        assert m["options"][m["answer_index"]] == "right" and m["misconceptions"][m["answer_index"]] is None
+        assert {"w1": "m1", "w2": "m2", "w3": "m3"}[m["options"][(m["answer_index"] + 1) % 4]] == m["misconceptions"][(m["answer_index"] + 1) % 4]
+        seen.add(m["answer_index"])
+    assert len(seen) == 4  # every position gets used
+
+
+def test_shuffle_skips_positional_options():
+    m = {"options": ["A only", "B only", "Both A and B", "None"], "answer_index": 2, "misconceptions": [None] * 4}
+    assert q._shuffle_options(m)["options"][2] == "Both A and B"
+
+
+def test_finish_quiz_attaches_evidence():
+    quiz = {"mcq": [{"question": "x", "options": ["a", "b", "c", "d"], "answer_index": 0, "misconceptions": [None] * 4,
+                     "source_quote": "Inorder traversal visits keys in sorted order"}]}
+    counts = q._finish_quiz(quiz, "A BST supports inorder traversal. Inorder traversal visits keys in sorted order.")
+    assert counts["verified"] == 1 and quiz["mcq"][0]["evidence"]["status"] == "verified"
+    assert q._finish_quiz({"mcq": [dict(quiz["mcq"][0])]}, "")["verified"] == 0
