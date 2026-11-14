@@ -4,13 +4,17 @@
 \section{JSON schema given to the model}
 \begin{lstlisting}[language=JSON, caption={Schema embedded in every generation prompt}, label={lst:schema}]
 {
+  "concepts": [{"name": str, "prereqs": [str]}],
   "mcq": [{"question": str, "options": [str, str, str, str],
-           "answer_index": 0-3, "explanation": str, "source_quote": str}],
-  "short": [{"question": str, "model_answer": str, "key_points": [str]}],
+           "answer_index": 0-3, "explanation": str, "source_quote": str,
+           "concept": str, "bloom": str, "hints": [str, str],
+           "misconceptions": [str|null, str|null, str|null, str|null]}],
+  "short": [{"question": str, "model_answer": str, "key_points": [str],
+             "concept": str, "bloom": str, "hints": [str, str]}],
   "coding": [{"question": str, "language": str, "starter_code": str,
               "solution": str,
               "test_cases": [{"input": str, "expected_output": str}],
-              "explanation": str}]
+              "explanation": str, "concept": str, "bloom": str}]
 }
 \end{lstlisting}
 

@@ -27,13 +27,18 @@ python -m recall.server
 Then open **http://localhost:8000**.
 In VS Code you can also press **F5** and pick "Run Recall website".
 
-## Adaptive learning (all computed in your browser, no extra AI calls)
+## Adaptive learning (computed in your browser; only teach-back adds a model call)
 - **Mastery tracking**: Bayesian Knowledge Tracing per concept; difficulty and focus can follow it ("Adapt to me").
 - **Spaced repetition**: SM-2 schedules reviews; "Start revision" works offline.
 - **Confidence check**: Guess / Unsure / Sure per answer; results show confident mistakes (misconceptions) separately.
 - **Mistake analysis**: each wrong option explains the misconception behind it; re-drill or practise a concept.
 - **Insights page**: weak/strong concepts, accuracy trend, calibration chart and a prerequisite knowledge graph.
 - **Long documents**: relevant passages are retrieved with local embeddings (BM25 fallback) instead of cutting the text.
+- **Evidence check**: each multiple-choice question's source quote is looked up in your text and labelled verified, partly supported or not found, with the matching passage on request. Option order is shuffled so the right answer is not always in the same slot.
+- **Bloom levels**: every question is tagged Remember to Create. Insights shows a concept by level grid, and adaptive quizzes ask for the lowest level you have not yet shown.
+- **Exam planner**: enter an exam date and a daily card limit. Recall estimates readiness (mastery times a retention curve tied to the review intervals), plans the days and starts today's cards.
+- **Hints and pace**: two hints per question that never give the answer. Hinted answers count as weaker evidence; very fast wrong answers count as guesses. Insights shows pace and hint use.
+- **Teach-back**: explain a concept in your own words, typed or spoken (Chrome). One model call compares it with your stored study material and reports covered points, missing points and a possible misconception.
 - Data is stored in this browser only (`recall.learning`); export/import/reset are on the Insights page.
 
 ## AI engines
@@ -49,12 +54,12 @@ recall/            Flask server + backend
   research.py      web research for topic quizzes (Wikipedia, DuckDuckGo, Tavily)
   file_loader.py   text extraction from PDF / DOCX / PPTX / TXT / MD
   sandbox.py       runs Python code against test cases
-  rag.py           local retrieval for long documents (fastembed -> BM25 -> sampling)
+  rag.py           local retrieval for long documents (fastembed -> BM25 -> sampling) and source-quote checks
   static/          the website: index.html, styles.css, app.js,
                    learning.js (mastery + scheduling maths), insights.js (dashboard)
 tests/             pytest suite (python -m pytest); JS logic: node recall/static/tests/run_node.js
 legacy_streamlit/  old Streamlit UI (streamlit run legacy_streamlit/app.py)
-scripts/           run.bat / run.sh launchers
+scripts/           run.bat / run.sh launchers; evaluate.py measures quiz quality (writes report/eval)
 report/            project report (LaTeX)
 ```
 
@@ -65,6 +70,8 @@ report/            project report (LaTeX)
 | POST | `/api/quiz/topic` | `{topic, use_web, depth, difficulty, n_mcq, n_short, n_code, language, engine}` |
 | POST | `/api/quiz/document` | multipart: `files[]`, `text`, `settings` (JSON) |
 | POST | `/api/grade` | `{answer, model_answer, key_points}` |
+| POST | `/api/grade/batch` | `{items: [{answer, model_answer, key_points}], engine}` (up to 6, one model call) |
+| POST | `/api/teachback` | `{concept, explanation, reference: [text], engine}` |
 | POST | `/api/run` | `{code, test_cases, language}` |
 
 ## Notes

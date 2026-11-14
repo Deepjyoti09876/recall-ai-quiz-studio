@@ -1,0 +1,152 @@
+\chapter{Adaptive Learning Engine}
+\label{chap:adaptive}
+
+\section{Purpose}
+A quiz that only reports a score does not tell the learner what to do next. This chapter describes the part of Recall that tracks what each learner knows, schedules reviews, checks that questions are supported by the source text, and chooses what to ask next. Almost all of it runs in the browser. The server stays stateless: the only extra model call is the optional teach-back check (Section~\ref{sec:teachback}).
+
+\section{Data Model}
+All learning state is stored in the browser under the key \texttt{recall.learning} (version~2) and is therefore private to one browser. It holds five collections:
+\begin{itemize}
+\item \textbf{concepts}: mastery $P(L)$, number of attempts, number correct, and per-Bloom-level counts for each concept;
+\item \textbf{cards}: one review card per question, with its ease factor, interval, due date and a copy of the question, so revision works offline;
+\item \textbf{attempts}: the last 600 answers, with correctness, confidence, response time, hints used and any misconception;
+\item \textbf{sessions}: the last 120 quizzes, with score and calibration;
+\item \textbf{graph}: concept nodes and prerequisite edges, plus the chosen exam date.
+\end{itemize}
+The file \texttt{learning.js} contains no user-interface code, so the same logic is tested in Node and in the browser. Caps keep the data well under the browser quota. A corrupt value is copied to a backup key before the state is reset, and data written by version~1 is migrated on load.
+
+\section{Concept Tagging in the Quiz Schema}
+The quiz request is the only model call that produces learning data. The JSON schema (Appendix~\ref{app:prompts}) asks for a list of concepts with their prerequisites, a concept and a Bloom level for every question, two hints for every multiple-choice and written question, and for each wrong option one sentence naming the misconception that makes it tempting. The function \texttt{\_validate} normalises the reply: it deduplicates concept names ignoring case, removes self-references, limits the lists, maps unknown concepts to \texttt{General}, forces the entry for the correct option to be empty, and drops malformed questions. A reply that contains only concepts and no questions is rejected.
+
+\section{Mastery Tracking}
+\label{sec:bkt}
+Mastery of a concept is estimated with Bayesian Knowledge Tracing (BKT). Let $p$ be the current mastery, $G$ the chance of a correct guess, $S$ the chance of a slip and $T$ the chance of learning from one attempt. The values depend on the question type (Table~\ref{tab:bkt}); the initial mastery is $0.30$.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Type & $G$ & $S$ & $T$ \\
+\midrule
+Multiple choice & 0.25 & 0.10 & 0.15 \\
+Written answer & 0.10 & 0.12 & 0.18 \\
+Coding & 0.05 & 0.15 & 0.20 \\
+\bottomrule
+\end{tabular}
+\caption{BKT parameters by question type}
+\label{tab:bkt}
+\end{table}
+
+After an answer the posterior mastery is
+\[
+p_{\mathrm{post}} =
+\begin{cases}
+\dfrac{p(1-S)}{p(1-S)+(1-p)G} & \text{correct},\\[2ex]
+\dfrac{pS}{pS+(1-p)(1-G)} & \text{wrong.}
+\end{cases}
+\]
+The answer is weighted by an evidence weight $w$, and learning is applied only as much as the answer supports:
+\[
+p_{\mathrm{obs}} = (1-w)\,p + w\,p_{\mathrm{post}},\qquad
+p' = \min\bigl(0.99,\max(0.02,\;p_{\mathrm{obs}} + (1-p_{\mathrm{obs}})\,T_{\mathrm{eff}})\bigr),
+\]
+with $T_{\mathrm{eff}} = wT$ for a correct answer and $0.02$ for a wrong one. This stops a run of guesses from raising mastery.
+
+The weight and the guess and slip values change with the learner's signals:
+\begin{itemize}
+\item \textbf{Sure}: $G$ and $S$ are halved, so a confident mistake lowers mastery more.
+\item \textbf{Guess}: $G$ is multiplied by $1.4$ (at most $0.5$) and $w=0.45$.
+\item \textbf{Retry} of a question seen in the same session: $w$ is multiplied by $0.3$ for a correct answer, because the answer was just shown.
+\item \textbf{Hints}: a correct answer after $h$ hints has $w$ multiplied by $0.6^{h}$.
+\item \textbf{Very fast and wrong}: a multiple-choice answer under three seconds, or under a quarter of the learner's own median once five timings exist, is treated like a guess unless the learner marked it \emph{sure}.
+\end{itemize}
+Mastery bands are weak ($<0.40$), developing, strong ($\ge 0.80$) and mastered ($\ge 0.95$).
+
+\section{Spaced Repetition}
+Every answered question becomes a review card scheduled with the SM-2 algorithm. The answer is converted to a quality grade $q$ (Table~\ref{tab:sm2}).
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+ & Sure & No confidence or unsure & Guess \\
+\midrule
+Correct & 5 & 4 & 3 \\
+Wrong & 0 & 1 & 2 \\
+\bottomrule
+\end{tabular}
+\caption{Quality grade $q$ from correctness and confidence}
+\label{tab:sm2}
+\end{table}
+
+The ease factor is updated as $EF' = \max\bigl(1.3,\;EF + 0.1 - (5-q)(0.08 + 0.02(5-q))\bigr)$ with $EF=2.5$ at the start. If $q<3$ the card restarts with an interval of one day, and a confident mistake ($q=0$) is due immediately. Otherwise the interval is $1$ day, then $6$ days, then $\mathrm{round}(I \cdot EF')$. Three confident correct answers give intervals of $1$, $6$ and $16$ days. Retries, re-drills and teach-backs do not change the schedule.
+
+\section{Confidence Calibration}
+Before an answer is revealed the learner marks \emph{guess}, \emph{unsure} or \emph{sure}. Each answer falls into one of four groups: solid mastery (sure and right), fragile knowledge (right but unsure or guessing), known gap (wrong and unsure) and misconception (sure but wrong). Calibration is summarised by the Brier score with stated probabilities $0.25$, $0.60$ and $0.90$ for the three levels:
+\[
+\mathrm{Brier} = \frac{1}{N}\sum_{i=1}^{N}(p_i - y_i)^2,\qquad y_i\in\{0,1\}.
+\]
+The Insights page shows $1-\mathrm{Brier}$ as a percentage.
+
+\section{Knowledge Graph and Recommendation}
+Prerequisite links from every quiz are merged into one graph. Before an edge is added the code checks whether the concept can already reach its prerequisite, and rejects the edge if that would create a cycle; language models sometimes propose loops across quizzes. To choose what to practise, the recommender takes the weakest concepts ($P(L)<0.45$) and walks upstream through their prerequisites with a visited set. If a prerequisite is itself weak or untried, it is recommended first, because the weakness may come from there.
+
+\section{Retrieval for Long Documents}
+The free model tier limits each request to about eight thousand tokens per minute, so a long document cannot be sent whole. Instead of cutting the text after a fixed number of characters, \texttt{rag.py} chooses the passages that matter. The text is split into chunks of about 1\,000 characters that respect headings and sentences. Chunks are scored against the learner's weak concepts, the document headings and the document centroid, using local embeddings (\texttt{bge-small-en-v1.5} through fastembed) once the model has loaded and BM25 until then, so a request never waits for the download. Chunks are then picked with Maximal Marginal Relevance,
+\[
+\mathrm{MMR}(c)=\lambda\,R(c)-(1-\lambda)\max_{s\in\text{selected}}\mathrm{sim}(c,s),
+\]
+with $\lambda=0.75$ when weak concepts are given and $0.60$ otherwise, until the character budget is used. The budget keeps prompt and expected answer within the token limit:
+\[
+B=\max\bigl(2400,\;\min(7000,\;4\,(5600-950-T_{\mathrm{out}}))\bigr),\qquad
+T_{\mathrm{out}}=250+240\,n_{\mathrm{mcq}}+140\,n_{\mathrm{short}}+280\,n_{\mathrm{code}}.
+\]
+
+\section{Evidence Check and Option Order}
+A model can write a question that its source does not support. Each multiple-choice question therefore carries a \texttt{source\_quote}, and \texttt{rag.locate} looks for it in the full source text, not only in the selected chunks. A quote found word for word, or with at least 80\% of its words in one chunk, is \emph{verified}; 50\% to 80\% is \emph{partly supported}; anything lower is \emph{not found}. The learner sees a badge and can open the matching passage. The check is lexical, so it finds unsupported quotes but cannot judge whether a supported quote really justifies the answer.
+
+Models also favour certain answer positions. The server shuffles the four options and keeps the answer index and the misconception list aligned, except when an option refers to others (``all of the above''). Revision and re-drill shuffle again in the browser so that the position of an answer cannot be memorised.
+
+\section{Bloom's Taxonomy}
+Every question is tagged with a Bloom level: remember, understand, apply, analyze, evaluate or create. The requested difficulty maps to levels in the prompt (easy to remember and understand, medium to apply and analyze, hard to analyze and evaluate). Mastery is counted per concept and level, and Insights shows a concept-by-level grid. The adaptive quiz asks for the lowest of the first five levels at which the learner has fewer than two answers or under 70\% accuracy.
+
+\section{Exam Readiness and Study Plan}
+The learner enters an exam date and how many cards they can review per day. Recall estimates the chance of recalling a card at time $t$ as $R=\exp(-\Delta t/s)$, where $\Delta t$ is the time since the last review and the stability is $s = I/\ln(1/0.9)$ for interval $I$, because SM-2 intervals aim at about 90\% recall on the due date. The readiness of a concept is $P(L)$ times the mean $R$ of its cards at the chosen time, and overall readiness is the mean over concepts. The plan simulates each day until the exam: it takes the cards that are due, up to the daily limit, assumes they are answered correctly and reschedules them with SM-2. In the last two days it adds cards whose recall chance on exam day is below $0.8$. Insights shows readiness today, on exam day if the learner stops, and on exam day if the learner follows the plan, and starts today's cards with one button. These are estimates built on assumptions, not predictions of an exam mark.
+
+\section{Hints and Response Time}
+In practice mode a question can show up to two hints, a nudge and then a stronger one, which are written not to state the answer. The time to the first answer is measured from when the question is first shown, and time spent in another browser tab is subtracted. Hints and timing feed the mastery update (Section~\ref{sec:bkt}) and appear on Insights as median time for right and wrong answers, the number of very fast answers and hint use per concept.
+
+\section{Teach-Back}
+\label{sec:teachback}
+Explaining an idea tests understanding more strongly than choosing an option. The learner types, or speaks where the browser supports speech recognition, an explanation of a concept. The server sends it with up to five pieces of the learner's own stored study material to the model through \texttt{POST /api/teachback}. The reply holds a score, the points covered, the points missing, a possible misconception and a follow-up question. If the model call fails the learner gets a neutral message and nothing is recorded. A successful result updates mastery but not the review schedule.
+
+\section{Evaluation}
+\label{sec:eval}
+The script \texttt{scripts/evaluate.py} generates quizzes on a fixed list of six topics at easy, medium and hard difficulty, with five multiple-choice and two written questions each, and measures the output. Table~\ref{tab:eval} lists the results of the run described below.
+
+\begin{table}[H]
+\centering
+\input{eval/summary.tex}
+\caption{Measured quiz quality}
+\label{tab:eval}
+\end{table}
+
+The run produced six quizzes with 29 multiple-choice questions after the validator dropped one malformed question; it used the cloud model on one network and the web research source for the source text. The results are a small sample and should be read as such.
+\begin{itemize}
+\item All six quizzes were valid and took 6.3 seconds on average. Every question carried a concept and hints, and no quiz contained a duplicate question.
+\item Of the multiple-choice source quotes, 72.4\% were found in the source text, 3.4\% were partly supported and 24.1\% were not found. A quarter of the quotes cannot be traced to the text, which is the reason for showing the badge instead of trusting the model.
+\item Only 44.8\% of multiple-choice questions had a misconception for all three wrong options. The model often explained two of them and left one empty. The interface simply omits the note when it is missing, but the prompt could be tightened.
+\item Before shuffling, the correct answer was in the first position for 48.3\% of questions and in the last for 6.9\%. After shuffling the four positions held 27.6\%, 17.2\%, 27.6\% and 27.6\%; with 29 questions this is close to the uniform 25\% each, and the first-position bias is gone.
+\item The Bloom levels followed the requested difficulty: easy quizzes used only remember and understand, while hard quizzes used analyze and evaluate for 8 of their 13 questions.
+\end{itemize}
+The figures can be reproduced with \texttt{python scripts/evaluate.py}, which writes \texttt{report/eval/results.csv}, \texttt{summary.md} and the table above.
+
+\section{Limitations}
+\begin{itemize}
+\item All learning data lives in one browser. Clearing site data removes it unless it was exported.
+\item The BKT parameters, the rules for hints and fast answers, and the retention curve are reasonable defaults and have not been fitted to data from real learners.
+\item Concept names and prerequisite links come from the model and can be inconsistent between quizzes. Reusing earlier names in the prompt reduces this but does not remove it.
+\item The evidence check compares words. A question can be marked verified and still be a poor question.
+\item Teach-back and written-answer grading depend on the model, and a score is a judgement, not a measurement.
+\item At the largest question counts the expected reply may exceed the free-tier token limit, and a request can then be rejected until the limit resets.
+\end{itemize}

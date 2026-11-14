@@ -221,6 +221,11 @@ LLMS_TXT = """# Recall - Adaptive AI Quiz Studio
 - Knowledge graph: concepts and their prerequisites, coloured by mastery.
 - Mistake analysis: every wrong option carries the misconception that makes it tempting.
 - Local retrieval: long documents are searched with local embeddings or BM25, not blindly truncated.
+- Evidence check: each multiple-choice question's source quote is looked up in the source text.
+- Bloom levels: questions are tagged Remember to Create; mastery is tracked per concept and level.
+- Exam planner: readiness estimate and a day-by-day review plan for a chosen exam date.
+- Hints and pace: hinted answers count as weaker evidence; very fast wrong answers count as guesses.
+- Teach-back: a learner's own explanation is judged against their study material (one model call).
 
 ## Privacy and architecture
 - The server is stateless. Mastery, schedules and history stay in the browser (localStorage).
@@ -228,7 +233,7 @@ LLMS_TXT = """# Recall - Adaptive AI Quiz Studio
 
 ## API
 - GET /api/status
-- POST /api/quiz/topic, POST /api/quiz/document, POST /api/grade, POST /api/run
+- POST /api/quiz/topic, POST /api/quiz/document, POST /api/grade, POST /api/grade/batch, POST /api/teachback, POST /api/run
 """
 
 
