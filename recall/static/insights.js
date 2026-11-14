@@ -57,6 +57,25 @@
     return `<ul class="tree">${keys.map((k) => `<li><b>${esc(names(k))}</b> needs: ${kids[k].map((p) => esc(names(p))).join(", ")}</li>`).join("")}</ul>`;
   }
 
+  const isoDay = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function examBlock() {
+    const ex = LR.state().exam, p = LR.plan();
+    const form = `<div class="row-actions exam-form"><label>Exam date <input type="date" id="examDate" value="${ex ? isoDay(ex.date) : ""}"></label>
+      <label>Cards per day <input type="number" id="examPerDay" min="3" max="60" value="${ex ? ex.perDay : 15}"></label>
+      <button class="btn primary sm" data-ins="exam-save">Save</button>${ex ? `<button class="btn ghost sm" data-ins="exam-clear">Clear</button>` : ""}</div>`;
+    if (!p) return `<p class="muted">Set your exam date and how many cards you can review per day. Recall estimates your readiness and plans the days.</p>${form}`;
+    if (!p.daysLeft) return `<p class="muted">That date is today or already past. Pick a later date.</p>${form}`;
+    const wp = new Map(p.withPlan.concepts.map((c) => [c.name, c.value]));
+    const rows = p.now.concepts.sort((a, b) => a.value - b.value).slice(0, 8).map((c) =>
+      `<div class="m-row"><span>${esc(c.name)}</span>${bar(pct(wp.get(c.name) || 0))}<small>${pct(c.value)}→${pct(wp.get(c.name) || 0)}%</small></div>`).join("");
+    const days = p.days.slice(0, 7).map((d) => `<li><b>${new Date(d.ts).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</b>: ${d.ids.length} card${d.ids.length > 1 ? "s" : ""} (${d.names.slice(0, 3).map(esc).join(", ")}${d.names.length > 3 ? "…" : ""})</li>`).join("");
+    const today = LR.planToday().length;
+    return `${form}<p><b>${p.daysLeft} day${p.daysLeft > 1 ? "s" : ""} left.</b> Estimated readiness: <b>${pct(p.now.overall)}%</b> today,
+      <b>${pct(p.atExam.overall)}%</b> on exam day if you stop now, <b>${pct(p.withPlan.overall)}%</b> if you follow the plan.</p>
+      ${rows}<ul class="plan-list">${days || "<li class=\"muted\">No reviews needed yet.</li>"}</ul>
+      ${today ? `<div class="row-actions"><button class="btn primary sm" data-ins="plan-today">${UI().ico("play")}Start today's plan (${today})</button></div>` : ""}`;
+  }
+
   function bloomGrid() {
     const rows = LR.bloomMatrix();
     if (!rows.length) return `<p class="muted">Answer a few questions to fill this in.</p>`;
@@ -117,6 +136,9 @@
         ${due.length ? `<p>${due.length} question${due.length > 1 ? "s" : ""} due: ${Object.entries(dueByConcept).slice(0, 6).map(([c, n]) => `${esc(c)} (${n})`).join(", ")}</p>
           <div class="row-actions"><button class="btn primary sm" data-ins="revise">${UI().ico("play")}Start revision (${Math.min(15, due.length)})</button></div>`
           : `<p class="muted">Nothing due. ${Object.keys(st.cards).length} card${Object.keys(st.cards).length === 1 ? "" : "s"} scheduled.</p>`}</section>
+
+      <section class="panel-block glass" aria-label="Exam readiness"><div class="panel-title">${UI().ico("timer")} Exam readiness
+        <span class="legend">an estimate from your mastery and review history</span></div>${examBlock()}</section>
 
       <div class="ins-grid">
         <section class="panel-block glass" aria-label="Needs work"><div class="panel-title">${UI().ico("x")} Needs work</div>
@@ -219,6 +241,14 @@
       if (a === "practice") UI().practiceConcept(b.dataset.c);
       else if (a === "adaptive") UI().adaptiveNext();
       else if (a === "revise") UI().startRevision();
+      else if (a === "plan-today") UI().startRevision(LR.planToday());
+      else if (a === "exam-clear") { LR.setExam(0, 15); render(container); }
+      else if (a === "exam-save") {
+        const v = container.querySelector("#examDate").value, per = +container.querySelector("#examPerDay").value;
+        const ts = v ? new Date(v + "T00:00:00").getTime() : NaN;
+        if (!(ts > Date.now())) { UI().toast("Pick an exam date in the future.", true); return; }
+        LR.setExam(ts, per); render(container);
+      }
       else if (a === "export") UI().download("recall-learning.json", LR.exportJSON(), "application/json");
       else if (a === "import") container.querySelector("#insImport").click();
       else if (a === "reset" && (await UI().ask("Delete all mastery, review schedules and the knowledge graph? This cannot be undone.", "Delete"))) {

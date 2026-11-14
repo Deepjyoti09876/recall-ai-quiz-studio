@@ -81,5 +81,22 @@ function runLearningTests(L, check) {
   L._setState(null); L.load();
   check("v1 data migrates to v2 and keeps attempts", L.state().version === 2 && L.state().attempts.length === 1 && typeof L.state().concepts.a.bloom === "object");
   check("recommend exposes a bloom level", typeof L.recommend().bloom === "string");
+
+  // --- exam readiness + plan
+  fresh();
+  const NOW = Date.now();
+  const mkItem = (c, i) => ({ type: "mcq", question: c + " q" + i, concept: c, bloom: "Apply", options: ["a", "b", "c", "d"], answer_index: 0 });
+  for (let i = 0; i < 6; i++) L.recordAttempt({ item: mkItem(i < 3 ? "Sorting" : "Hashing", i), correct: true, conf: "sure", kind: "quiz" });
+  L.recordAttempt({ item: mkItem("Hashing", 9), correct: false, conf: "sure", kind: "quiz" });
+  const r1 = L.readinessAt(L.state().cards, NOW + 1 * 86400000).overall;
+  const r30 = L.readinessAt(L.state().cards, NOW + 30 * 86400000).overall;
+  check("readiness falls as time passes without review", r30 < r1, [r1, r30]);
+  L.setExam(NOW + 10 * 86400000, 4);
+  const pl = L.plan(NOW);
+  check("plan: respects the daily cap and stays before the exam", pl.days.every((d) => d.ids.length <= 4 && d.ts < L.state().exam.date), pl.days.map((d) => d.ids.length));
+  check("plan: reviewing raises readiness at the exam", pl.withPlan.overall >= pl.atExam.overall, [pl.atExam.overall, pl.withPlan.overall]);
+  check("plan: today's cards are real cards", L.planToday(NOW).every((c) => L.state().cards[c.qid]));
+  check("exam date in the past gives no days", (L.setExam(NOW - 5 * 86400000, 5), L.plan(NOW).days.length === 0));
+  check("clearing the exam clears the plan", (L.setExam(0, 5), L.plan(NOW) === null));
 }
 if (typeof module !== "undefined") module.exports = runLearningTests;

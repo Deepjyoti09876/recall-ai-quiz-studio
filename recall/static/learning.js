@@ -18,7 +18,7 @@
   };
   const CONF_P = { guess: 0.25, unsure: 0.6, sure: 0.9 };
 
-  const empty = () => ({ version: 2, concepts: {}, cards: {}, attempts: [], sessions: [], graph: { nodes: {}, edges: [] } });
+  const empty = () => ({ version: 2, concepts: {}, cards: {}, attempts: [], sessions: [], graph: { nodes: {}, edges: [] }, exam: null });
   let state = null;
   let dirty = false;
   let saveTimer = null;
@@ -48,6 +48,8 @@
     s.graph = s.graph && s.graph.nodes ? s.graph : { nodes: {}, edges: [] };
     s.graph.edges = Array.isArray(s.graph.edges) ? s.graph.edges : [];
     Object.values(s.concepts).forEach((c) => { if (!c.bloom || typeof c.bloom !== "object") c.bloom = {}; });  // v1 -> v2
+    if (s.exam && !(s.exam.date > 0)) s.exam = null;
+    if (s.exam === undefined) s.exam = null;
     s.version = 2;
     return s;
   }
@@ -303,6 +305,57 @@
     }
     return "Create";
   }
+  /* ---------------- exam readiness and study plan ---------------- */
+  const LN_RETAIN = Math.log(1 / 0.9);  // SM-2 intervals aim at about 90% recall on the due date
+  const retention = (card, t) => {
+    const stability = Math.max(card.interval || 0, 0.5) / LN_RETAIN;  // days
+    return Math.exp(-Math.max(0, (t - card.last) / DAY) / stability);
+  };
+  const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  /* readiness of a concept at time t = mastery x average chance the learner still recalls its cards */
+  function readinessAt(cards, t) {
+    const cons = S().concepts, by = {};
+    Object.values(cards).forEach((c) => { (by[keyOf(c.concept)] = by[keyOf(c.concept)] || []).push(retention(c, t)); });
+    const rows = Object.entries(cons).filter(([, c]) => c.n > 0).map(([k, c]) => {
+      const r = by[k] && by[k].length ? by[k].reduce((a, b) => a + b, 0) / by[k].length : 0.5;
+      return { name: c.name, value: c.pL * r };
+    });
+    return { overall: rows.length ? rows.reduce((a, r) => a + r.value, 0) / rows.length : 0, concepts: rows };
+  }
+  function setExam(dateTs, perDay) {
+    S().exam = dateTs > 0 ? { date: dayStart(dateTs), perDay: clamp(Math.round(perDay) || 15, 3, 60) } : null;
+    save(true);
+    return S().exam;
+  }
+  /* Simulates reviewing due cards each day (capped), assuming correct answers, then a final sweep of fading cards. */
+  function plan(now = Date.now()) {
+    const exam = S().exam;
+    if (!exam) return null;
+    const today = dayStart(now), days = Math.round((exam.date - today) / DAY);
+    if (days < 1) return { exam, daysLeft: 0, days: [], now: readinessAt(S().cards, now), atExam: readinessAt(S().cards, exam.date), withPlan: readinessAt(S().cards, exam.date) };
+    const sim = JSON.parse(JSON.stringify(S().cards));
+    const out = [];
+    for (let d = 0; d < days; d++) {
+      const start = today + d * DAY, end = start + DAY - 1, when = start + 9 * 3600e3;
+      const picked = Object.values(sim).filter((c) => c.due <= end).sort((a, b) => a.due - b.due).slice(0, exam.perDay);
+      if (d >= days - 2) {  // last two days: top up with cards likely forgotten by exam day
+        const have = new Set(picked.map((c) => c.qid));
+        const fading = Object.values(sim).filter((c) => !have.has(c.qid) && retention(c, exam.date) < 0.8)
+          .sort((a, b) => retention(a, exam.date) - retention(b, exam.date));
+        picked.push(...fading.slice(0, Math.max(0, exam.perDay - picked.length)));
+      }
+      picked.forEach((c) => { sm2Update(c, true, null, when); });
+      if (picked.length) out.push({ ts: start, ids: picked.map((c) => c.qid), names: [...new Set(picked.map((c) => c.concept))] });
+    }
+    return { exam, daysLeft: days, days: out, now: readinessAt(S().cards, now), atExam: readinessAt(S().cards, exam.date), withPlan: readinessAt(sim, exam.date) };
+  }
+  /* the real cards to review today under the plan */
+  function planToday(now = Date.now()) {
+    const p = plan(now);
+    if (!p || !p.days.length || p.days[0].ts !== dayStart(now)) return [];
+    return p.days[0].ids.map((id) => S().cards[id]).filter(Boolean);
+  }
+
   function recommend(count = 4) {
     const s = S(), cons = s.concepts;
     let weak = Object.entries(cons).filter(([, c]) => c.n > 0 && c.pL < 0.45).sort((a, b) => a[1].pL - b[1].pL);
@@ -342,7 +395,7 @@
     KEY, CAPS, P_INIT, empty, load, save, reset, importJSON, exportJSON, state: S,
     qid, band, keyOf, normalizeQuiz, bktUpdate, quality, sm2Update, ensureConcept, mergeGraph, reaches,
     recordAttempt, recordSession, dueCards, cardsForConcept, conceptList, vocab, upstream,
-    BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
+    readinessAt, setExam, plan, planToday, BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
     onError: (fn) => { onError = fn; },
     _setState: (s) => { state = s; },
   };
