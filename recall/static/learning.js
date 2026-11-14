@@ -135,12 +135,15 @@
   }
 
   /* ---------------- BKT ---------------- */
-  function bktUpdate(p, correct, conf, type, kind) {
+  function bktUpdate(p, correct, conf, type, kind, opts) {
+    opts = opts || {};
     const base = BKT[type] || BKT.mcq;
     let G = base.G, Sl = base.S, w = 1;
     if (conf === "sure") { G *= 0.5; Sl *= 0.5; }
     else if (conf === "guess") { G = Math.min(0.5, G * 1.4); w = 0.45; }
     if (kind === "retry" && correct) w *= 0.3;
+    if (correct && opts.hints) w *= Math.pow(0.6, opts.hints);  // a hinted answer is weaker evidence
+    if (opts.rushed && !correct && conf !== "sure") { G = Math.min(0.5, base.G * 1.4); w = Math.min(w, 0.45); }  // very fast and wrong: probably a guess
     const post = correct
       ? (p * (1 - Sl)) / (p * (1 - Sl) + (1 - p) * G)
       : (p * Sl) / (p * Sl + (1 - p) * (1 - G));
@@ -208,6 +211,14 @@
   }
 
   /* ---------------- recording ---------------- */
+  const median = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  /* very fast: MCQ under 3 s, or under a quarter of the learner's own median once there are 5 samples */
+  function isRushed(ms, type) {
+    if (!(ms >= 0)) return false;
+    if (type === "mcq" && ms < 3000) return true;
+    const prev = S().attempts.filter((x) => x.type === type && x.ms > 0).map((x) => x.ms);
+    return prev.length >= 5 && ms < 0.25 * median(prev);
+  }
   function snapshot(item) { return JSON.parse(JSON.stringify(item)); }
   function recordAttempt(a) {
     // a: {item, correct:true|false|null, conf, kind, pick, misc, difficulty, mode}
@@ -216,7 +227,8 @@
     const concept = norm(item.concept) || "General";
     if (a.correct == null) return null;
     const c = ensureConcept(concept, now);
-    c.pL = bktUpdate(c.pL, a.correct, a.conf || null, item.type, a.kind);
+    const rushed = isRushed(a.ms, item.type), hints = a.hints || 0;
+    c.pL = bktUpdate(c.pL, a.correct, a.conf || null, item.type, a.kind, { hints, rushed });
     c.n++; if (a.correct) c.correct++;
     const lvl = BLOOM.includes(item.bloom) ? item.bloom : "Understand";
     const bl = (c.bloom = c.bloom || {})[lvl] = c.bloom[lvl] || [0, 0];
@@ -229,7 +241,8 @@
       card.concept = concept;
       sm2Update(card, a.correct, a.conf || null, now);
     }
-    const rec = { ts: now, qid: id, concept, type: item.type, bloom: item.bloom || "Understand", correct: a.correct, conf: a.conf || null, kind: a.kind || "quiz", misc: a.misc || null };
+    const rec = { ts: now, qid: id, concept, type: item.type, bloom: item.bloom || "Understand", correct: a.correct, conf: a.conf || null, kind: a.kind || "quiz", misc: a.misc || null,
+      ms: a.ms >= 0 ? Math.round(a.ms) : null, hints, rushed };
     s.attempts.push(rec);
     save();
     return rec;
@@ -377,6 +390,17 @@
     const notes = weakMisconceptions(3).filter((m) => names.some((n) => keyOf(n) === keyOf(m.concept)) || !names.length).map((m) => m.misc);
     return { concepts: names, notes, difficulty: suggestDifficulty(names), bloom: nextBloom(names), details };
   }
+  /* answer habits across all attempts: pace, rushed answers, hint use */
+  function behaviour() {
+    const at = S().attempts, timed = at.filter((x) => x.ms > 0);
+    const byConcept = {};
+    at.forEach((x) => { if (x.hints) byConcept[x.concept] = (byConcept[x.concept] || 0) + x.hints; });
+    const rushed = at.filter((x) => x.rushed);
+    return { n: at.length, timed: timed.length,
+      medRight: median(timed.filter((x) => x.correct).map((x) => x.ms)), medWrong: median(timed.filter((x) => !x.correct).map((x) => x.ms)),
+      rushed: rushed.length, rushedWrong: rushed.filter((x) => !x.correct).length,
+      hints: at.reduce((a, x) => a + (x.hints || 0), 0), hintsByConcept: byConcept };
+  }
   function calibration(attempts) {
     const rows = (attempts || []).filter((a) => a.conf && a.correct != null);
     const lv = { guess: { n: 0, r: 0 }, unsure: { n: 0, r: 0 }, sure: { n: 0, r: 0 } };
@@ -395,7 +419,7 @@
     KEY, CAPS, P_INIT, empty, load, save, reset, importJSON, exportJSON, state: S,
     qid, band, keyOf, normalizeQuiz, bktUpdate, quality, sm2Update, ensureConcept, mergeGraph, reaches,
     recordAttempt, recordSession, dueCards, cardsForConcept, conceptList, vocab, upstream,
-    readinessAt, setExam, plan, planToday, BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
+    behaviour, isRushed, readinessAt, setExam, plan, planToday, BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
     onError: (fn) => { onError = fn; },
     _setState: (s) => { state = s; },
   };

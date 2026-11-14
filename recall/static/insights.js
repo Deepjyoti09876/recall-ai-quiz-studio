@@ -76,6 +76,18 @@
       ${today ? `<div class="row-actions"><button class="btn primary sm" data-ins="plan-today">${UI().ico("play")}Start today's plan (${today})</button></div>` : ""}`;
   }
 
+  function habitsBlock() {
+    const b = LR.behaviour();
+    if (!b.timed && !b.hints) return `<p class="muted">Answer a few questions to see your pace and hint use.</p>`;
+    const sec = (ms) => (ms == null ? "n/a" : (ms / 1000).toFixed(1) + " s");
+    const topHint = Object.entries(b.hintsByConcept).sort((a, c) => c[1] - a[1])[0];
+    return `<div class="metrics habits">
+      <div class="metric glass"><div class="v">${sec(b.medRight)}</div><div class="l">Median time, right answers</div></div>
+      <div class="metric glass"><div class="v">${sec(b.medWrong)}</div><div class="l">Median time, wrong answers</div></div>
+      <div class="metric glass"><div class="v">${b.rushed}</div><div class="l">Very fast answers (${b.rushedWrong} wrong)</div></div>
+      <div class="metric glass"><div class="v">${b.hints}</div><div class="l">Hints used${topHint ? `, most on ${esc(topHint[0])}` : ""}</div></div></div>`;
+  }
+
   function bloomGrid() {
     const rows = LR.bloomMatrix();
     if (!rows.length) return `<p class="muted">Answer a few questions to fill this in.</p>`;
@@ -146,6 +158,9 @@
         <section class="panel-block glass" aria-label="Strengths"><div class="panel-title">${UI().ico("check")} Strengths</div>
           ${strong.length ? strong.slice(0, 8).map((c) => `<div class="m-row"><span>${esc(c.name)}</span>${bar(pct(c.pL))}<small>${pct(c.pL)}%</small></div>`).join("") : `<p class="muted">Keep practising to build strengths.</p>`}</section>
       </div>
+
+      <section class="panel-block glass" aria-label="Answer habits"><div class="panel-title">${UI().ico("timer")} Answer habits
+        <span class="legend">pace and hint use. Very fast = under 3 s on a multiple-choice question</span></div>${habitsBlock()}</section>
 
       <section class="panel-block glass" aria-label="Thinking levels"><div class="panel-title">${UI().ico("brain")} Thinking levels (Bloom)
         <span class="legend">accuracy per concept and level, "·" = not tried. Next level to practise: <b>${esc(rec.bloom)}</b></span></div>

@@ -98,5 +98,17 @@ function runLearningTests(L, check) {
   check("plan: today's cards are real cards", L.planToday(NOW).every((c) => L.state().cards[c.qid]));
   check("exam date in the past gives no days", (L.setExam(NOW - 5 * 86400000, 5), L.plan(NOW).days.length === 0));
   check("clearing the exam clears the plan", (L.setExam(0, 5), L.plan(NOW) === null));
+
+  // --- hints and response time
+  check("hinted correct answer gains less", L.bktUpdate(0.3, true, null, "mcq", "quiz", { hints: 2 }) < L.bktUpdate(0.3, true, null, "mcq", "quiz", {}));
+  check("rushed wrong counts as a guess (smaller drop)", L.bktUpdate(0.6, false, null, "mcq", "quiz", { rushed: true }) > L.bktUpdate(0.6, false, null, "mcq", "quiz", {}));
+  check("rushed + sure + wrong still drops hard", L.bktUpdate(0.6, false, "sure", "mcq", "quiz", { rushed: true }) === L.bktUpdate(0.6, false, "sure", "mcq", "quiz", {}));
+  fresh();
+  check("isRushed: MCQ under 3 s", L.isRushed(1500, "mcq") && !L.isRushed(4000, "mcq"));
+  for (let i = 0; i < 6; i++) L.recordAttempt({ item: { type: "short", question: "s" + i, concept: "Paging", options: [], answer_index: 0 }, correct: true, ms: 40000, hints: i === 0 ? 2 : 0, kind: "quiz" });
+  check("isRushed: under a quarter of own median", L.isRushed(8000, "short") && !L.isRushed(20000, "short"));
+  L.recordAttempt({ item: { type: "short", question: "fast", concept: "Paging", options: [], answer_index: 0 }, correct: false, ms: 5000, kind: "quiz" });
+  const bh = L.behaviour();
+  check("behaviour summary", bh.rushed === 1 && bh.rushedWrong === 1 && bh.hints === 2 && bh.hintsByConcept.Paging === 2 && bh.medRight === 40000, bh);
 }
 if (typeof module !== "undefined") module.exports = runLearningTests;

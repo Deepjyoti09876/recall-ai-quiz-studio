@@ -34,7 +34,7 @@ def test_concepts_only_is_not_a_quiz():
 
 
 def test_budget_and_focus_prompt():
-    assert q.context_budget(5, 2, 0, True) == 7000
+    assert q.context_budget(3, 1, 0, True) == 7000
     assert q.context_budget(20, 10, 5, True) == 2400
     assert q.context_budget(5, 2, 0, False) == 10000
     p = q.build_prompt("text", "Easy", 1, 0, 0, "Python", focus={"concepts": ["Graphs"], "vocab": ["Trees"]})
@@ -119,3 +119,11 @@ def test_bloom_normalised_and_focus_line():
 def test_settings_focus_bloom():
     assert _settings({"focus_bloom": "Apply"})["focus"] == {"concepts": [], "notes": [], "vocab": [], "bloom": "Apply"}
     assert _settings({"focus_bloom": "Hack"})["focus"] is None
+
+
+def test_hints_validated():
+    v = q._validate({"mcq": [{"question": "a", "options": list("abcd"), "answer_index": 0, "hints": ["nudge", "", "more", "third"]},
+                             {"question": "b", "options": list("abcd"), "answer_index": 0, "hints": "bad"}],
+                     "short": [{"question": "c", "model_answer": "m", "hints": ["only one"]}]})
+    assert v["mcq"][0]["hints"] == ["nudge", "more"] and v["mcq"][1]["hints"] == [] and v["short"][0]["hints"] == ["only one"]
+    assert q.build_prompt("t", "Easy", 1, 1, 0, "Python").count("never states the answer") == 1

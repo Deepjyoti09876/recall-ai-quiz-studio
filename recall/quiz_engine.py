@@ -37,8 +37,9 @@ SYSTEM = (
 SCHEMA = """{
   "concepts": [{"name": str, "prereqs": [str]}],
   "mcq": [{"question": str, "options": [str, str, str, str], "answer_index": 0-3, "explanation": str,
-           "source_quote": str, "concept": str, "bloom": str, "misconceptions": [str|null, str|null, str|null, str|null]}],
-  "short": [{"question": str, "model_answer": str, "key_points": [str], "concept": str, "bloom": str}],
+           "source_quote": str, "concept": str, "bloom": str, "hints": [str, str],
+           "misconceptions": [str|null, str|null, str|null, str|null]}],
+  "short": [{"question": str, "model_answer": str, "key_points": [str], "concept": str, "bloom": str, "hints": [str, str]}],
   "coding": [{"question": str, "language": str, "starter_code": str, "solution": str,
               "test_cases": [{"input": str, "expected_output": str}], "explanation": str, "concept": str, "bloom": str}]
 }"""
@@ -49,7 +50,8 @@ CONCEPT_RULES = """Concept tagging (required):
 - Every question has a "concept" copied exactly from that list.
 - Every question has a "bloom" level: Remember, Understand, Apply, Analyze, Evaluate or Create, matching the thinking it needs.
 - For each MCQ, "misconceptions" has 4 entries. For every WRONG option write one short sentence (max 20 words)
-  naming the wrong belief that would make a student pick it. The entry for the correct option is null."""
+  naming the wrong belief that would make a student pick it. The entry for the correct option is null.
+- Every MCQ and short question has "hints": two strings, a gentle nudge and then a stronger one. A hint never states the answer."""
 
 # Groq free tier allows ~8,000 tokens per minute: keep prompt + answer well below that.
 GROQ_TOKEN_TARGET = 5600
@@ -60,7 +62,7 @@ def context_budget(n_mcq, n_short, n_code, use_groq):
     """Max characters of source material so prompt + expected answer fit the Groq TPM limit."""
     if not use_groq:
         return 10_000
-    out_tokens = 250 + 190 * n_mcq + 110 * n_short + 260 * n_code
+    out_tokens = 250 + 240 * n_mcq + 140 * n_short + 280 * n_code
     return int(max(2400, min(7000, 4 * (GROQ_TOKEN_TARGET - PROMPT_OVERHEAD_TOKENS - out_tokens))))
 
 
@@ -146,7 +148,12 @@ def _validate(data: dict) -> dict:
         elif isinstance(c, str):
             add_concept(c)
 
+    def clean_hints(q):
+        h = q.get("hints")
+        q["hints"] = [str(x).strip()[:200] for x in h if str(x or "").strip()][:2] if isinstance(h, list) else []
+
     def tag(q, default_bloom="Understand"):
+        clean_hints(q)
         b = str(q.get("bloom") or "").strip().capitalize()
         q["bloom"] = b if b in BLOOM else default_bloom
         name = add_concept(q.get("concept"))

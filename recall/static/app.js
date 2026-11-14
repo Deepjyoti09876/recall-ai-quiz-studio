@@ -298,7 +298,7 @@
     S.quiz = {
       id: historyId || "q" + Date.now(), quiz, title, source, sources: sources || [], difficulty, mode,
       timer: +timer || 15, items: qs, answers: {}, revealed: {}, grades: {}, code: {}, flagged: new Set(),
-      conf: {}, committed: {}, sessAtt: [], sessionSaved: false, kind,
+      conf: {}, committed: {}, sessAtt: [], sessionSaved: false, kind, ms: {}, hintsUsed: {}, shownIdx: -1, shownAt: 0, hiddenAt: 0,
       i: 0, started: Date.now(), finished: null, retry,
     };
     if (quiz && quiz.concepts && kind !== "revision") LR.mergeGraph(quiz.concepts, title);
@@ -333,6 +333,7 @@
 
   function renderQuestion() {
     const z = Q(), i = z.i, q = z.items[i], n = z.items.length, practice = z.mode === "Practice";
+    if (z.shownIdx !== i) { z.shownIdx = i; z.shownAt = Date.now(); }  // time per question starts when it is first shown
     $("#quizMeta").textContent = `Question ${i + 1} of ${n}. ${z.difficulty}, ${z.mode.toLowerCase()} mode.`;
     $("#progressBar").style.width = `${((i + 1) / n) * 100}%`;
 
@@ -358,6 +359,7 @@
     if (q.type === "mcq") {
       const picked = z.answers[i], locked = practice && z.revealed[i];
       body += confBar;
+      if (!locked) body += hintUI(i, q, z, practice);
       body += `<div class="options">${q.options.map((o, j) => {
         let cls = "opt", mark = "";
         if (locked) {
@@ -380,6 +382,7 @@
       body += confBar;
       body += `<textarea class="answer-box" id="ansBox" placeholder="Write your answer in your own words…">${esc(val)}</textarea>`;
       if (practice) {
+        body += hintUI(i, q, z, practice);
         body += `<div class="row-actions"><button class="btn primary sm" id="gradeBtn">${ico("target")}Check with AI</button>
           <button class="btn ghost sm" id="showModel">${ico("info")}Show model answer</button></div>`;
         body += renderGrade(i, q);
@@ -406,6 +409,29 @@
     $("#flagBtn").classList.toggle("ok", z.flagged.has(i));
     wireQuestion(i, q);
   }
+
+  /* ---------------- hints and response time ---------------- */
+  function hintUI(i, q, z, practice) {
+    const hs = q.hints || [];
+    if (!practice || !hs.length) return "";
+    const used = Math.min(z.hintsUsed[i] || 0, hs.length);
+    return `<div class="hint-row">${hs.slice(0, used).map((h) => `<div class="hint-note">${esc(h)}</div>`).join("")}${used < hs.length
+      ? `<button type="button" class="btn ghost sm" data-hint>${ico("info")}Hint (${hs.length - used} left)<kbd>H</kbd></button>` : ""}</div>`;
+  }
+  function useHint() {
+    const z = Q(), q = z.items[z.i];
+    if (!q || !(q.hints || []).length || z.mode !== "Practice" || z.committed[z.i] || (q.type === "mcq" && z.revealed[z.i])) return;
+    if ((z.hintsUsed[z.i] || 0) >= q.hints.length) return;
+    z.hintsUsed[z.i] = (z.hintsUsed[z.i] || 0) + 1;
+    renderQuestion();
+  }
+  const markTime = (i) => { const z = Q(); if (z.ms[i] == null) z.ms[i] = Math.min(Date.now() - z.shownAt, 600000); };
+  document.addEventListener("visibilitychange", () => {  // time spent in another tab does not count
+    const z = S.quiz;
+    if (!z || z.finished) return;
+    if (document.hidden) z.hiddenAt = Date.now();
+    else if (z.hiddenAt) { z.shownAt += Date.now() - z.hiddenAt; z.hiddenAt = 0; }
+  });
 
   /* ---------------- evidence from the source text ---------------- */
   const EV_LABEL = { verified: "Verified in source", partial: "Partly supported", unsupported: "Not found in source" };
@@ -443,6 +469,7 @@
     const z = Q();
     $$("[data-opt]").forEach((b) => b.onclick = () => pickOption(+b.dataset.opt));
     $$("[data-conf]").forEach((b) => b.onclick = () => setConf(b.dataset.conf));
+    $$("[data-hint]").forEach((b) => b.onclick = useHint);
     const ans = $("#ansBox");
     if (ans) ans.oninput = () => { z.answers[i] = ans.value; };
     const code = $("#codeBox");
@@ -470,6 +497,7 @@
   function pickOption(j) {
     const z = Q(), i = z.i, q = z.items[i];
     if (q.type !== "mcq" || (z.mode === "Practice" && z.revealed[i])) return;
+    markTime(i);
     z.answers[i] = q.options[j];
     if (z.mode === "Practice") {
       if (S.settings.askConf !== false && !z.conf[i]) { z.awaiting = i; renderQuestion(); return; }  // ask confidence first
@@ -513,7 +541,7 @@
       else if (q.type === "short") misc = (z.grades[i] || {}).misconception || null;
     }
     const conf = q.type === "coding" ? null : z.conf[i] || null;
-    LR.recordAttempt({ item: q, correct, conf, misc, kind: z.kind });
+    LR.recordAttempt({ item: q, correct, conf, misc, kind: z.kind, ms: z.ms[i], hints: z.hintsUsed[i] || 0 });
     z.sessAtt.push({ conf, correct });
   }
   function commitSession() {
@@ -530,6 +558,7 @@
   async function gradeShort(i, q) {
     const z = Q(), answer = (z.answers[i] || "").trim();
     if (!answer) { toast("Write an answer first.", true); return; }
+    markTime(i);
     z.grades[i] = { loading: true };
     renderQuestion();
     try {
@@ -648,6 +677,13 @@
       html += `<section class="panel-block glass" aria-label="Confidence check"><div class="panel-title">${ico("target")} Confidence check</div>
         <div class="quad">${CAL_QUADS.map(([k, t, d]) => `<div class="q-${k}"><b>${cal.quads[k]}</b><span>${t}</span><small>${d}</small></div>`).join("")}</div>
         <p class="muted note">${note}</p></section>`;
+    }
+    const fast = z.items.map((q, i) => i).filter((i) => z.items[i].type === "mcq" && z.ms[i] != null && z.ms[i] < 3000);
+    const fastWrong = fast.filter((i) => outcome(i) === false).length;
+    const hinted = Object.values(z.hintsUsed).filter((n) => n > 0).length;
+    if (fast.length || hinted) {
+      html += `<section class="panel-block glass" aria-label="Pace and hints"><div class="panel-title">${ico("timer")} Pace and hints</div>
+        <p class="muted note" style="margin:0">${fast.length ? `${fast.length} multiple-choice answer${fast.length > 1 ? "s were" : " was"} under 3 seconds${fastWrong ? `, ${fastWrong} of them wrong. Slow down on those.` : ", all correct."} ` : ""}${hinted ? `You used hints on ${hinted} question${hinted > 1 ? "s" : ""}; those count as weaker evidence of mastery.` : ""}</p></section>`;
     }
     const groups = {};
     z.items.forEach((q, i) => {
@@ -1028,7 +1064,8 @@
       if (typing) return;
       const q = Q().items[Q().i];
       const k = e.key.toLowerCase();
-      if (q.type !== "coding" && S.settings.askConf !== false && ["g", "u", "s"].includes(k)) { setConf({ g: "guess", u: "unsure", s: "sure" }[k]); }
+      if (k === "h") { useHint(); }
+      else if (q.type !== "coding" && S.settings.askConf !== false && ["g", "u", "s"].includes(k)) { setConf({ g: "guess", u: "unsure", s: "sure" }[k]); }
       else if (q.type === "mcq" && ["1", "2", "3", "4", "a", "b", "c", "d"].includes(k)) { pickOption("1234".includes(k) ? +k - 1 : "abcd".indexOf(k)); }
       else if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); go(1); }
       else if (e.key === "ArrowLeft") go(-1);

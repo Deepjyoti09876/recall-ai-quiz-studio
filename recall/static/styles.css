@@ -460,3 +460,9 @@ pre.code { margin: 8px 0 0; padding: 14px 16px; border-radius: 10px; background:
 .exam-form input { height: 34px; padding: 0 10px; border-radius: var(--r-ctl); border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; color-scheme: dark; }
 .exam-form input[type=number] { width: 72px; }
 .plan-list { margin: 12px 0 0; padding-left: 18px; line-height: 1.8; font-size: .92rem; color: var(--ink-2); }
+
+/* ---- hints ---- */
+.hint-row { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 10px 0 4px; }
+.hint-note { padding: 10px 14px; border-radius: var(--r-ctl); background: var(--panel); border: 1px solid var(--line-hi); color: var(--ink-2); font-size: .92rem; line-height: 1.5; }
+.hint-row kbd { font-family: var(--mono); font-size: .68rem; opacity: .55; margin-left: 4px; }
+.habits { margin: 0; }
