@@ -279,7 +279,7 @@
     const out = { difficulty, n_mcq, n_short, n_code, language, engine, concept_vocab: LR.vocab(40) };
     if (allowAdapt && S.settings.adaptive) {
       const rec = LR.recommend();
-      if (rec.concepts.length) { out.focus_concepts = rec.concepts; out.focus_notes = rec.notes; }
+      if (rec.concepts.length) { out.focus_concepts = rec.concepts; out.focus_notes = rec.notes; out.focus_bloom = rec.bloom; }
       if (LR.conceptList().some((c) => c.n > 0)) out.difficulty = rec.difficulty;  // keep the chosen level until there is data
     }
     return out;
@@ -677,7 +677,7 @@
   const masteryBar = (pl) => `<span class="mastery-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pl}" aria-label="Mastery ${pl}%"><span class="${pl < 40 ? "bad" : pl < 80 ? "warn" : "ok"}" style="width:${pl}%"></span></span><small class="muted">${pl}%</small>`;
 
   /* ---------------- focused generation (adaptive / practice-this) & revision ---------------- */
-  async function generateFocused({ topic, title, focus, notes, difficulty, kind, useWeb = false, n_mcq = 5 }) {
+  async function generateFocused({ topic, title, focus, notes, difficulty, kind, useWeb = false, n_mcq = 5, bloom }) {
     if (S.demo) { toast("Start the local server to generate new questions.", true); return; }
     S.abort = new AbortController();
     startLoading(useWeb ? "topic" : "topicOffline", `Building a quiz on “${title}”`);
@@ -685,7 +685,7 @@
       const data = await api("/api/quiz/topic", {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: S.abort.signal,
         body: JSON.stringify({ ...payloadSettings(), n_mcq, n_short: 0, n_code: 0, difficulty, topic, use_web: useWeb, depth: S.settings.depth,
-          focus_concepts: focus, focus_notes: notes }),
+          focus_concepts: focus, focus_notes: notes, focus_bloom: bloom }),
       });
       stopLoading();
       startQuiz({ quiz: data.quiz, title, source: "topic", sources: data.sources || [], difficulty, mode: "Practice", timer: S.settings.timer, kind });
@@ -698,7 +698,7 @@
     const z = S.quiz && !$("#view-results").hidden ? S.quiz : null;  // only add quiz context when called from its results
     const topic = z && z.title ? `${name} (${z.title})` : name;
     const n = notes || LR.weakMisconceptions(20).filter((m) => LR.keyOf(m.concept) === LR.keyOf(name)).slice(0, 3).map((m) => m.misc);
-    return generateFocused({ topic, title: "Practice · " + name, focus: [name], notes: n, difficulty: LR.suggestDifficulty([name]), kind: "practice-this" });
+    return generateFocused({ topic, title: "Practice · " + name, focus: [name], notes: n, difficulty: LR.suggestDifficulty([name]), bloom: LR.nextBloom([name]), kind: "practice-this" });
   }
   function adaptiveNext() {
     const rec = LR.recommend();
@@ -706,7 +706,7 @@
     const base = rec.concepts[0] ? (z && z.title ? `${rec.concepts[0]} (${z.title})` : rec.concepts[0]) : (z ? z.title : "");
     if (!base) { toast("Take a quiz first so Recall can adapt to you.", true); return; }
     return generateFocused({ topic: base, title: "Adaptive · " + (rec.concepts[0] || (z && z.title)), focus: rec.concepts, notes: rec.notes,
-      difficulty: rec.difficulty, kind: "quiz", useWeb: !!(z && z.source === "topic" && S.settings.use_web) });
+      difficulty: rec.difficulty, bloom: rec.bloom, kind: "quiz", useWeb: !!(z && z.source === "topic" && S.settings.use_web) });
   }
   function startRevision(list) {
     const cards = (list || LR.dueCards()).slice(0, 15);

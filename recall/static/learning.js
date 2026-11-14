@@ -7,6 +7,7 @@
   "use strict";
 
   const KEY = "recall.learning";
+  const BLOOM = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
   const DAY = 86400000;
   const CAPS = { attempts: 600, sessions: 120, cards: 300, concepts: 200, edges: 600 };
   const P_INIT = 0.3;
@@ -17,7 +18,7 @@
   };
   const CONF_P = { guess: 0.25, unsure: 0.6, sure: 0.9 };
 
-  const empty = () => ({ version: 1, concepts: {}, cards: {}, attempts: [], sessions: [], graph: { nodes: {}, edges: [] } });
+  const empty = () => ({ version: 2, concepts: {}, cards: {}, attempts: [], sessions: [], graph: { nodes: {}, edges: [] } });
   let state = null;
   let dirty = false;
   let saveTimer = null;
@@ -46,7 +47,8 @@
     s.sessions = Array.isArray(s.sessions) ? s.sessions : [];
     s.graph = s.graph && s.graph.nodes ? s.graph : { nodes: {}, edges: [] };
     s.graph.edges = Array.isArray(s.graph.edges) ? s.graph.edges : [];
-    s.version = 1;
+    Object.values(s.concepts).forEach((c) => { if (!c.bloom || typeof c.bloom !== "object") c.bloom = {}; });  // v1 -> v2
+    s.version = 2;
     return s;
   }
   function load() {
@@ -117,6 +119,7 @@
     const fix = (q, type) => {
       const c = { ...q };
       c.concept = norm(c.concept) || "General";
+      c.bloom = BLOOM.includes(c.bloom) ? c.bloom : type === "coding" ? "Apply" : "Understand";
       if (!known.has(keyOf(c.concept))) { known.add(keyOf(c.concept)); out.concepts.push({ name: c.concept, prereqs: [] }); }
       if (type === "mcq") {
         const m = Array.isArray(c.misconceptions) && c.misconceptions.length === 4 ? c.misconceptions.slice() : [null, null, null, null];
@@ -168,7 +171,7 @@
   function ensureConcept(name, now) {
     const s = S(), k = keyOf(name);
     if (!k) return null;
-    if (!s.concepts[k]) s.concepts[k] = { name: norm(name), pL: P_INIT, n: 0, correct: 0, last: now || Date.now(), topics: [] };
+    if (!s.concepts[k]) s.concepts[k] = { name: norm(name), pL: P_INIT, n: 0, correct: 0, last: now || Date.now(), topics: [], bloom: {} };
     if (!s.graph.nodes[k]) s.graph.nodes[k] = { name: norm(name) };
     return s.concepts[k];
   }
@@ -213,6 +216,9 @@
     const c = ensureConcept(concept, now);
     c.pL = bktUpdate(c.pL, a.correct, a.conf || null, item.type, a.kind);
     c.n++; if (a.correct) c.correct++;
+    const lvl = BLOOM.includes(item.bloom) ? item.bloom : "Understand";
+    const bl = (c.bloom = c.bloom || {})[lvl] = c.bloom[lvl] || [0, 0];
+    bl[0]++; if (a.correct) bl[1]++;
     c.last = now;
     if (a.kind !== "retry") {
       let card = s.cards[id];
@@ -221,7 +227,7 @@
       card.concept = concept;
       sm2Update(card, a.correct, a.conf || null, now);
     }
-    const rec = { ts: now, qid: id, concept, type: item.type, correct: a.correct, conf: a.conf || null, kind: a.kind || "quiz", misc: a.misc || null };
+    const rec = { ts: now, qid: id, concept, type: item.type, bloom: item.bloom || "Understand", correct: a.correct, conf: a.conf || null, kind: a.kind || "quiz", misc: a.misc || null };
     s.attempts.push(rec);
     save();
     return rec;
@@ -282,6 +288,21 @@
     }
     return levels[idx];
   }
+  /* Bloom levels: concept x level counts, and the lowest level the learner has not yet shown (>= 70% over >= 2 answers). */
+  function bloomMatrix() {
+    return Object.values(S().concepts).filter((c) => c.n > 0).map((c) => ({ name: c.name, levels: c.bloom || {} }));
+  }
+  function nextBloom(names) {
+    const cons = S().concepts;
+    const list = (names && names.length ? names.map((n) => cons[keyOf(n)]) : Object.values(cons)).filter((c) => c && c.n > 0);
+    const tot = {};
+    list.forEach((c) => Object.entries(c.bloom || {}).forEach(([l, v]) => { const t = (tot[l] = tot[l] || [0, 0]); t[0] += v[0]; t[1] += v[1]; }));
+    for (const l of BLOOM.slice(0, 5)) {
+      const t = tot[l];
+      if (!t || t[0] < 2 || t[1] / t[0] < 0.7) return l;
+    }
+    return "Create";
+  }
   function recommend(count = 4) {
     const s = S(), cons = s.concepts;
     let weak = Object.entries(cons).filter(([, c]) => c.n > 0 && c.pL < 0.45).sort((a, b) => a[1].pL - b[1].pL);
@@ -301,7 +322,7 @@
     const details = [...picked.values()].map((t) => ({ name: cons[t.key].name, reason: t.reason, pL: t.pL }));
     const names = details.map((d) => d.name);
     const notes = weakMisconceptions(3).filter((m) => names.some((n) => keyOf(n) === keyOf(m.concept)) || !names.length).map((m) => m.misc);
-    return { concepts: names, notes, difficulty: suggestDifficulty(names), details };
+    return { concepts: names, notes, difficulty: suggestDifficulty(names), bloom: nextBloom(names), details };
   }
   function calibration(attempts) {
     const rows = (attempts || []).filter((a) => a.conf && a.correct != null);
@@ -321,7 +342,7 @@
     KEY, CAPS, P_INIT, empty, load, save, reset, importJSON, exportJSON, state: S,
     qid, band, keyOf, normalizeQuiz, bktUpdate, quality, sm2Update, ensureConcept, mergeGraph, reaches,
     recordAttempt, recordSession, dueCards, cardsForConcept, conceptList, vocab, upstream,
-    weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
+    BLOOM, bloomMatrix, nextBloom, weakMisconceptions, suggestDifficulty, recommend, calibration, flush: () => { dirty = true; return writeNow(); },
     onError: (fn) => { onError = fn; },
     _setState: (s) => { state = s; },
   };

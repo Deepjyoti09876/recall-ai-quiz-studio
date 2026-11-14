@@ -67,5 +67,19 @@ function runLearningTests(L, check) {
   // --- normalizeQuiz
   const nq = L.normalizeQuiz({ mcq: [{ question: "x", options: ["a", "b", "c", "d"], answer_index: 2 }] });
   check("normalizeQuiz: default concept + misconceptions", nq.mcq[0].concept === "General" && nq.mcq[0].misconceptions[2] === null && nq.concepts[0].name === "General");
+
+  // --- Bloom + storage v2
+  fresh();
+  L._setState(L.empty());
+  const bi = (c, lvl, ok) => L.recordAttempt({ item: { type: "mcq", question: c + lvl + Math.random(), concept: c, bloom: lvl, options: ["a", "b", "c", "d"], answer_index: 0 }, correct: ok, kind: "quiz" });
+  bi("Graphs", "Remember", true); bi("Graphs", "Remember", true); bi("Graphs", "Apply", false);
+  check("bloom counts recorded", L.state().concepts["graphs"].bloom.Remember[0] === 2 && L.state().concepts["graphs"].bloom.Apply[1] === 0);
+  check("nextBloom: Understand untried comes first", L.nextBloom(["Graphs"]) === "Understand", L.nextBloom(["Graphs"]));
+  bi("Graphs", "Understand", true); bi("Graphs", "Understand", true);
+  check("nextBloom moves up once a level is solid", L.nextBloom(["Graphs"]) === "Apply", L.nextBloom(["Graphs"]));
+  localStorage.setItem(L.KEY, JSON.stringify({ version: 1, concepts: { a: { name: "A", pL: 0.5, n: 1, correct: 1, last: 1, topics: [] } }, cards: {}, attempts: [{ ts: 1 }], sessions: [], graph: { nodes: {}, edges: [] } }));
+  L._setState(null); L.load();
+  check("v1 data migrates to v2 and keeps attempts", L.state().version === 2 && L.state().attempts.length === 1 && typeof L.state().concepts.a.bloom === "object");
+  check("recommend exposes a bloom level", typeof L.recommend().bloom === "string");
 }
 if (typeof module !== "undefined") module.exports = runLearningTests;

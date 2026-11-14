@@ -16,12 +16,14 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_FALLBACK_MODEL = "openai/gpt-oss-20b"
 LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3.2:3b")
 
+BLOOM = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
+
 DIFFICULTY_GUIDE = {
-    "Easy": "Recall and definitions. Direct facts from the text. Obvious distractors. "
+    "Easy": "Bloom levels Remember and Understand. Recall and definitions. Direct facts from the text. Obvious distractors. "
             "Coding: simple one-concept tasks (loops, conditionals, basic functions).",
-    "Medium": "Understanding and application. Apply concepts to small scenarios. Plausible distractors. "
+    "Medium": "Bloom levels Apply and Analyze. Understanding and application. Apply concepts to small scenarios. Plausible distractors. "
               "Coding: moderate logic, standard data structures, small algorithms.",
-    "Hard": "Analysis and problem solving. Multi-step reasoning, edge cases, subtle distractors. "
+    "Hard": "Bloom levels Analyze and Evaluate. Analysis and problem solving. Multi-step reasoning, edge cases, subtle distractors. "
             "Coding: optimisation, complexity analysis, tricky edge cases.",
 }
 
@@ -35,16 +37,17 @@ SYSTEM = (
 SCHEMA = """{
   "concepts": [{"name": str, "prereqs": [str]}],
   "mcq": [{"question": str, "options": [str, str, str, str], "answer_index": 0-3, "explanation": str,
-           "source_quote": str, "concept": str, "misconceptions": [str|null, str|null, str|null, str|null]}],
-  "short": [{"question": str, "model_answer": str, "key_points": [str], "concept": str}],
+           "source_quote": str, "concept": str, "bloom": str, "misconceptions": [str|null, str|null, str|null, str|null]}],
+  "short": [{"question": str, "model_answer": str, "key_points": [str], "concept": str, "bloom": str}],
   "coding": [{"question": str, "language": str, "starter_code": str, "solution": str,
-              "test_cases": [{"input": str, "expected_output": str}], "explanation": str, "concept": str}]
+              "test_cases": [{"input": str, "expected_output": str}], "explanation": str, "concept": str, "bloom": str}]
 }"""
 
 CONCEPT_RULES = """Concept tagging (required):
 - "concepts" lists 3-8 key concepts the questions cover. Each name is a 1-4 word Title Case noun phrase.
 - "prereqs" lists concepts a learner must understand first (prefer names from the same list; empty if none).
 - Every question has a "concept" copied exactly from that list.
+- Every question has a "bloom" level: Remember, Understand, Apply, Analyze, Evaluate or Create, matching the thinking it needs.
 - For each MCQ, "misconceptions" has 4 entries. For every WRONG option write one short sentence (max 20 words)
   naming the wrong belief that would make a student pick it. The entry for the correct option is null."""
 
@@ -68,6 +71,8 @@ def _focus_text(focus):
     if focus.get("concepts"):
         lines.append("FOCUS: the learner is weak at: " + ", ".join(focus["concepts"]) +
                      ". At least 70% of the questions MUST directly assess these concepts.")
+    if focus.get("bloom") in BLOOM:
+        lines.append(f"Write the questions at the {focus['bloom']} level of Bloom's taxonomy.")
     if focus.get("notes"):
         lines.append("Design MCQ distractors and short-answer prompts that test and remediate these "
                      "misconceptions the learner showed: " + " | ".join(focus["notes"]) + ".")
@@ -141,7 +146,9 @@ def _validate(data: dict) -> dict:
         elif isinstance(c, str):
             add_concept(c)
 
-    def tag(q):
+    def tag(q, default_bloom="Understand"):
+        b = str(q.get("bloom") or "").strip().capitalize()
+        q["bloom"] = b if b in BLOOM else default_bloom
         name = add_concept(q.get("concept"))
         if not name:
             name = canon.get(_clean_name(q.get("concept")).lower()) or add_concept("General") or "General"
@@ -170,7 +177,7 @@ def _validate(data: dict) -> dict:
         mcq.append(tag(q))
     short = [tag(q) for q in (data.get("short") or [])
              if isinstance(q, dict) and q.get("question") and q.get("model_answer")]
-    coding = [tag(q) for q in (data.get("coding") or [])
+    coding = [tag(q, "Apply") for q in (data.get("coding") or [])
               if isinstance(q, dict) and q.get("question") and q.get("solution")]
     concepts = [{"name": canon[k], "prereqs": prereqs[k]} for k in canon]
     return {"mcq": mcq, "short": short, "coding": coding, "concepts": concepts}

@@ -13,7 +13,7 @@ Serves the website in /static and a small JSON API:
   GET  /robots.txt /sitemap.xml /llms.txt /manifest.webmanifest   crawler + install metadata
 
 Topic/document endpoints also accept optional adaptive hints in the settings:
-  focus_concepts, focus_notes, concept_vocab   (lists of short strings)
+  focus_concepts, focus_notes, concept_vocab   (lists of short strings), focus_bloom (one Bloom level)
 """
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ load_dotenv()
 from . import rag
 from .file_loader import extract_text
 from .quiz_engine import (
+    BLOOM,
     _clean_name,
     generate_quiz,
     generate_topic_quiz,
@@ -80,6 +81,7 @@ def _settings(src: dict) -> dict:
     focus = {"concepts": names("focus_concepts", 8, 60),
              "notes": names("focus_notes", 3, 160),
              "vocab": names("concept_vocab", 40, 60)}
+    focus["bloom"] = src.get("focus_bloom") if src.get("focus_bloom") in BLOOM else None
     s["focus"] = focus if any(focus.values()) else None
     if s["n_mcq"] + s["n_short"] + s["n_code"] == 0:
         raise ValueError("Choose at least one question.")

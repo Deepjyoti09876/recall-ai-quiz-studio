@@ -442,3 +442,14 @@ pre.code { margin: 8px 0 0; padding: 14px 16px; border-radius: 10px; background:
 .evidence { margin-top: 12px; font-size: .92rem; color: var(--ink-2); }
 .evidence summary { cursor: pointer; color: var(--accent); }
 .evidence p { margin: 8px 0 0; padding-left: 12px; border-left: 2px solid var(--line-hi); font-family: var(--font-read); line-height: 1.55; }
+
+/* ---- Bloom grid ---- */
+.bloom-wrap { overflow-x: auto; }
+.bloom-grid { width: 100%; border-collapse: separate; border-spacing: 4px; font-size: .86rem; }
+.bloom-grid th { font-weight: 500; color: var(--ink-3); text-align: center; padding: 4px 6px; }
+.bloom-grid tbody th { text-align: left; color: var(--ink-2); white-space: nowrap; }
+.bloom-grid td { text-align: center; padding: 8px 6px; border-radius: 8px; min-width: 64px; font-weight: 600; }
+.bloom-grid td.bad { background: var(--bad-bg); color: var(--bad); }
+.bloom-grid td.warn { background: rgba(230,192,104,.12); color: var(--warn); }
+.bloom-grid td.ok { background: var(--ok-bg); color: var(--ok); }
+.bloom-grid td.b-none { color: var(--ink-3); font-weight: 400; border: 1px dashed var(--line); }

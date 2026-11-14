@@ -105,3 +105,17 @@ def test_finish_quiz_attaches_evidence():
     counts = q._finish_quiz(quiz, "A BST supports inorder traversal. Inorder traversal visits keys in sorted order.")
     assert counts["verified"] == 1 and quiz["mcq"][0]["evidence"]["status"] == "verified"
     assert q._finish_quiz({"mcq": [dict(quiz["mcq"][0])]}, "")["verified"] == 0
+
+
+def test_bloom_normalised_and_focus_line():
+    v = q._validate({"mcq": [{"question": "a", "options": list("abcd"), "answer_index": 0, "bloom": "analyze"},
+                             {"question": "b", "options": list("abcd"), "answer_index": 0, "bloom": "nonsense"}],
+                     "coding": [{"question": "c", "solution": "x"}]})
+    assert v["mcq"][0]["bloom"] == "Analyze" and v["mcq"][1]["bloom"] == "Understand" and v["coding"][0]["bloom"] == "Apply"
+    assert "Evaluate level" in q.build_prompt("t", "Hard", 1, 0, 0, "Python", focus={"bloom": "Evaluate"})
+    assert "Bloom's taxonomy" not in q.build_prompt("t", "Hard", 1, 0, 0, "Python", focus={"bloom": "bogus"}).split("JSON schema")[0].split("Concept tagging")[1][-200:]
+
+
+def test_settings_focus_bloom():
+    assert _settings({"focus_bloom": "Apply"})["focus"] == {"concepts": [], "notes": [], "vocab": [], "bloom": "Apply"}
+    assert _settings({"focus_bloom": "Hack"})["focus"] is None

@@ -57,6 +57,19 @@
     return `<ul class="tree">${keys.map((k) => `<li><b>${esc(names(k))}</b> needs: ${kids[k].map((p) => esc(names(p))).join(", ")}</li>`).join("")}</ul>`;
   }
 
+  function bloomGrid() {
+    const rows = LR.bloomMatrix();
+    if (!rows.length) return `<p class="muted">Answer a few questions to fill this in.</p>`;
+    const head = LR.BLOOM.map((l) => `<th scope="col">${l}</th>`).join("");
+    const body = rows.slice(0, 12).map((r) => `<tr><th scope="row">${esc(r.name)}</th>${LR.BLOOM.map((l) => {
+      const v = r.levels[l];
+      if (!v || !v[0]) return `<td class="b-none">·</td>`;
+      const acc = Math.round((100 * v[1]) / v[0]);
+      return `<td class="${cls(acc)}" title="${v[1]} of ${v[0]} correct">${acc}%</td>`;
+    }).join("")}</tr>`).join("");
+    return `<div class="bloom-wrap"><table class="bloom-grid"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
   function render(container) {
     destroy();
     const my = ++token;
@@ -111,6 +124,10 @@
         <section class="panel-block glass" aria-label="Strengths"><div class="panel-title">${UI().ico("check")} Strengths</div>
           ${strong.length ? strong.slice(0, 8).map((c) => `<div class="m-row"><span>${esc(c.name)}</span>${bar(pct(c.pL))}<small>${pct(c.pL)}%</small></div>`).join("") : `<p class="muted">Keep practising to build strengths.</p>`}</section>
       </div>
+
+      <section class="panel-block glass" aria-label="Thinking levels"><div class="panel-title">${UI().ico("brain")} Thinking levels (Bloom)
+        <span class="legend">accuracy per concept and level, "·" = not tried. Next level to practise: <b>${esc(rec.bloom)}</b></span></div>
+        ${bloomGrid()}</section>
 
       <div class="ins-grid">
         <section class="panel-block glass" aria-label="Accuracy trend"><div class="panel-title">${UI().ico("chart")} Accuracy trend</div>
