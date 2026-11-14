@@ -492,3 +492,4 @@ pre.code { margin: 8px 0 0; padding: 14px 16px; border-radius: 10px; background:
   .seg button, .chip-btn, .btn.sm, .conf-seg button { min-height: 44px; }
   .icon-btn { min-width: 44px; min-height: 44px; }
 }
+.empty-state .btn { font-family: var(--font-ui); }
