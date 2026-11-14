@@ -366,6 +366,14 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def _window(chunk_text: str, quote: str) -> str:
+    """Up to 300 characters of the original chunk around where the quote starts (original case and spacing)."""
+    words = re.findall(r"\w+", quote or "")[:4]
+    m = re.search(r"\W+".join(map(re.escape, words)), chunk_text, re.I) if words else None
+    start = max(0, (m.start() if m else 0) - 80)
+    return ("…" if start else "") + chunk_text[start:start + 300]
+
+
 def locate(text: str, quote: str) -> dict:
     """Check that `quote` (a question's source_quote) is supported by `text`.
 
@@ -385,9 +393,7 @@ def locate(text: str, quote: str) -> dict:
         low = _norm(c["text"])
         pos = low.find(nq)
         if pos >= 0:
-            start = max(0, pos - 80)
-            return {"status": "verified", "score": 1.0, "heading": c["heading"],
-                    "passage": ("…" if start else "") + low[start:start + 300]}
+            return {"status": "verified", "score": 1.0, "heading": c["heading"], "passage": _window(c["text"], quote)}
     qt = set(_tokens(nq))
     if not qt:
         return {"status": "no_quote", **empty}

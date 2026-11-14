@@ -75,3 +75,9 @@ def test_locate_statuses():
     assert rag.locate(text, "Photosynthesis converts light into chemical energy in chloroplasts")["status"] == "unsupported"
     assert rag.locate(text, "")["status"] == "no_quote"
     assert rag.locate("", "anything at all here")["status"] == "no_source"
+
+
+def test_locate_passage_keeps_original_case():
+    text = "## Trees\n\nA Binary Search Tree keeps smaller keys left.  Inorder traversal therefore visits keys in SORTED order."
+    v = rag.locate(text, "inorder traversal therefore visits keys in sorted order")
+    assert v["status"] == "verified" and "SORTED" in v["passage"] and "Inorder" in v["passage"]
