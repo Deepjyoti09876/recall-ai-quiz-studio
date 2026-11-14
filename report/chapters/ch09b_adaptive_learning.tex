@@ -134,7 +134,7 @@ The script \texttt{scripts/evaluate.py} generates quizzes on a fixed list of six
 The run produced six quizzes with 29 multiple-choice questions after the validator dropped one malformed question; it used the cloud model on one network and the web research source for the source text. The results are a small sample and should be read as such.
 \begin{itemize}
 \item All six quizzes were valid and took 6.3 seconds on average. Every question carried a concept and hints, and no quiz contained a duplicate question.
-\item Of the multiple-choice source quotes, 72.4\% were found in the source text, 3.4\% were partly supported and 24.1\% were not found. A quarter of the quotes cannot be traced to the text, which is the reason for showing the badge instead of trusting the model.
+\item Of the multiple-choice source quotes, 72.4\% were found in the source text, 3.4\% were partly supported and 24.1\% were not found. A quarter of the quotes cannot be traced to the text, which is why the interface shows an evidence badge on every question.
 \item Only 44.8\% of multiple-choice questions had a misconception for all three wrong options. The model often explained two of them and left one empty. The interface simply omits the note when it is missing, but the prompt could be tightened.
 \item Before shuffling, the correct answer was in the first position for 48.3\% of questions and in the last for 6.9\%. After shuffling the four positions held 27.6\%, 17.2\%, 27.6\% and 27.6\%; with 29 questions this is close to the uniform 25\% each, and the first-position bias is gone.
 \item The Bloom levels followed the requested difficulty: easy quizzes used only remember and understand, while hard quizzes used analyze and evaluate for 8 of their 13 questions.

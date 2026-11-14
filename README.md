@@ -33,7 +33,7 @@ In VS Code you can also press **F5** and pick "Run Recall website".
 - **Confidence check**: Guess / Unsure / Sure per answer; results show confident mistakes (misconceptions) separately.
 - **Mistake analysis**: each wrong option explains the misconception behind it; re-drill or practise a concept.
 - **Insights page**: weak/strong concepts, accuracy trend, calibration chart and a prerequisite knowledge graph.
-- **Long documents**: relevant passages are retrieved with local embeddings (BM25 fallback) instead of cutting the text.
+- **Long documents**: relevant passages are picked with local embeddings (BM25 fallback), so a long file is no longer cut off after a fixed length.
 - **Evidence check**: each multiple-choice question's source quote is looked up in your text and labelled verified, partly supported or not found, with the matching passage on request. Option order is shuffled so the right answer is not always in the same slot.
 - **Bloom levels**: every question is tagged Remember to Create. Insights shows a concept by level grid, and adaptive quizzes ask for the lowest level you have not yet shown.
 - **Exam planner**: enter an exam date and a daily card limit. Recall estimates readiness (mastery times a retention curve tied to the review intervals), plans the days and starts today's cards.
