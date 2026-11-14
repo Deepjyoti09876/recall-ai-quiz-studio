@@ -278,7 +278,7 @@ def screen_quiz():
                      height=240, label_visibility="collapsed", placeholder="Write your code…")
         S.answers.setdefault(i, default) if default else None
 
-        # Code sandbox — run tests
+        # Code sandbox: run tests
         if run_tests and q.get("test_cases"):
             if st.button("Run Tests", type="primary", use_container_width=True,
                          key=f"run_{S.quiz_id}_{i}"):
@@ -428,7 +428,7 @@ def screen_results():
 
     c3, c4 = st.columns(2)
 
-    # Retry mistakes button — creates a mini quiz of only wrong/skipped MCQs
+    # Retry mistakes button: creates a mini quiz of only wrong/skipped MCQs
     wrong_items = [(i, q) for i, q in enumerate(S.qs) if q["type"] == "mcq" and status(i, q) in ("wrong", "skipped")]
     if c3.button(f"Retry {len(wrong_items)} mistakes", use_container_width=True,
                  disabled=len(wrong_items) == 0, type="primary"):
@@ -483,7 +483,7 @@ def screen_review():
             # Show AI grade if available
             if i in S.get("short_grades", {}):
                 grade = S.short_grades[i]
-                body += f'<p><span class="k">AI Score</span><br><b>{grade.get("score", "?")}%</b> — {esc(grade.get("feedback", ""))}</p>'
+                body += f'<p><span class="k">AI Score</span><br><b>{grade.get("score", "?")}%</b>: {esc(grade.get("feedback", ""))}</p>'
             md(f'<div class="card">{body}</div>')
         else:
             md(f'<div class="card">{body}</div>')

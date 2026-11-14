@@ -1,5 +1,5 @@
 /* =========================================================
-   Recall · AI Quiz Studio — frontend logic (no build step)
+   Recall · AI Quiz Studio: frontend logic (no build step)
    ========================================================= */
 (() => {
   "use strict";
@@ -186,7 +186,7 @@
     const ok = /\.(pdf|docx|pptx|txt|md)$/i;
     let rejected = 0;
     [...list].forEach((f) => { if (ok.test(f.name)) S.files.push(f); else rejected++; });
-    if (rejected) toast(`${rejected} file(s) skipped — use PDF, DOCX, PPTX, TXT or MD.`, true);
+    if (rejected) toast(`${rejected} file(s) skipped. Use PDF, DOCX, PPTX, TXT or MD.`, true);
     renderFiles();
   }
 
@@ -229,7 +229,7 @@
     let title, kind, request;
     if (S.source === "topic") {
       const topic = $("#topicInput").value.trim();
-      if (topic.length < 2) { toast("Type a topic first — anything you want to learn.", true); $("#topicInput").focus(); return; }
+      if (topic.length < 2) { toast("Type a topic first. Anything you want to learn works.", true); $("#topicInput").focus(); return; }
       title = topic;
       kind = st.use_web ? "topic" : "topicOffline";
       request = () => api("/api/quiz/topic", {
@@ -261,7 +261,7 @@
       }
       stopLoading();
       if (S.source === "topic" && st.use_web && !S.demo && data.web_used === false) {
-        toast("Couldn't reach the web — questions are from the AI's own knowledge.");
+        toast("Couldn't reach the web. The questions come from the AI's own knowledge.");
       }
       startQuiz({
         quiz: data.quiz, title, source: S.source, sources: data.sources || [],
@@ -324,7 +324,7 @@
       const left = Q().timer * 60 - (Date.now() - Q().started) / 1000;
       $("span", el).textContent = fmtTime(Math.max(0, left));
       el.classList.toggle("urgent", left < 60);
-      if (left <= 0) { stopTimer(); toast("Time's up — submitting your exam."); finish(); }
+      if (left <= 0) { stopTimer(); toast("Time's up. Submitting your exam."); finish(); }
     };
     tick();
     S.timerId = setInterval(tick, 500);
@@ -577,7 +577,7 @@
     const secs = Math.round((z.finished - z.started) / 1000);
     const pct = total ? Math.round((100 * right) / total) : null;
     const head = pct == null ? "Quiz complete." : pct >= 90 ? "Outstanding recall." : pct >= 75 ? "Strong work." : pct >= 50 ? "Getting there." : "Worth another pass.";
-    const sub = pct == null ? "No multiple-choice questions to auto-score — compare your answers with the model answers in review."
+    const sub = pct == null ? "No multiple-choice questions to auto-score. Compare your answers with the model answers in review."
       : `You got ${right} of ${total} multiple-choice questions right${z.retry ? ` in retry round ${z.retry}` : ""}.`;
     const wrong = z.items.filter((q, j) => q.type === "mcq" && status(j) !== "right");
     const C = 2 * Math.PI * 88;
@@ -762,7 +762,7 @@
   }
   const slug = (s) => (s || "quiz").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "quiz";
   function toMarkdown(z) {
-    const out = [`# ${z.title} — Quiz (${z.difficulty})`, ""];
+    const out = [`# ${z.title}: Quiz (${z.difficulty})`, ""];
     const qz = z.quiz;
     (qz.mcq || []).forEach((q, i) => {
       out.push(`**Q${i + 1}. ${q.question}**`, ...q.options.map((o, j) => `- ${"ABCD"[j]}. ${o}`), "", `Answer: ${"ABCD"[q.answer_index]}. ${q.explanation || ""}`, "");
@@ -792,7 +792,7 @@
       } else if (q.type === "short") {
         b += `<span class="k">Your answer</span><p>${esc(a || "—")}</p><span class="k">Model answer</span><p>${esc(q.model_answer)}</p>`;
         if ((q.key_points || []).length) b += `<span class="k">Key points</span><ul class="kp">${q.key_points.map((k) => `<li>${ico("spark")}${esc(k)}</li>`).join("")}</ul>`;
-        if (z.grades[i] && !z.grades[i].loading) b += `<span class="k">AI score</span><p><b>${z.grades[i].score}%</b> — ${esc(z.grades[i].feedback || "")}</p>`;
+        if (z.grades[i] && !z.grades[i].loading) b += `<span class="k">AI score</span><p><b>${z.grades[i].score}%</b>: ${esc(z.grades[i].feedback || "")}</p>`;
       } else {
         b += `<span class="k">Your code</span><pre class="code">${esc(a || "—")}</pre><span class="k">Solution</span><pre class="code">${esc(q.solution)}</pre>`;
         if (q.explanation) b += `<p>${esc(q.explanation)}</p>`;
@@ -802,7 +802,7 @@
       return `<div class="rev-card glass">${b}</div>`;
     }).join("");
     $("#view-review").innerHTML = `<div class="rev-head"><button class="btn ghost sm" data-act="back">${ico("arrowLeft")}Results</button><h2>${onlyWrong ? "Your mistakes" : "All questions"}</h2></div>
-      ${cards || `<div class="empty-state">${ico("check")}<p>Nothing to review — every multiple-choice answer was correct.</p></div>`}`;
+      ${cards || `<div class="empty-state">${ico("check")}<p>Nothing to review. Every multiple-choice answer was correct.</p></div>`}`;
   }
 
   /* ---------------- history & stats ---------------- */
@@ -915,7 +915,7 @@
       (words.some((w) => a.includes(w)) ? hits : misses).push(k);
     });
     const score = q.key_points?.length ? Math.round((100 * hits.length) / q.key_points.length) : 50;
-    return { score, hits, misses, feedback: "Demo grading checks key words only — the real server uses AI to judge your answer." };
+    return { score, hits, misses, feedback: "Demo grading checks key words only. The real server uses AI to judge your answer." };
   }
 
   /* ---------------- events ---------------- */
@@ -923,7 +923,7 @@
     show("home");
     if (p === "topic" || p === "home") { setSource("topic"); $("#topicInput").focus(); }
     if (p === "docs") { setSource("docs"); }
-    if (p === "exam") { S.settings.mode = "Exam"; saveSettings(); syncControls(); toast(`Exam mode on — ${S.settings.timer} min timer. Change it under the mix button.`); $(S.source === "topic" ? "#topicInput" : "#pasteInput").focus(); }
+    if (p === "exam") { S.settings.mode = "Exam"; saveSettings(); syncControls(); toast(`Exam mode on, ${S.settings.timer} min timer. Change it under the mix button.`); $(S.source === "topic" ? "#topicInput" : "#pasteInput").focus(); }
     if (p === "code") { S.settings.n_code = Math.max(2, S.settings.n_code); S.settings.language = "Python"; saveSettings(); syncControls(); setSource("topic"); toast("Coding questions added (Python, with live tests)."); $("#topicInput").focus(); }
     setNav(p === "docs" ? "docs" : p === "topic" ? "topic" : "home");
   }

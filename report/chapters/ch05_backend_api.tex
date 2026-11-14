@@ -1,6 +1,6 @@
 \chapter{Backend Development \& API Design}
 
-\section{Introduction to the API Ecosystem}
+\section{Introduction}
 The back end is a single Flask application (\texttt{recall/server.py}) that serves the static front end at \texttt{/} and exposes six JSON endpoints under \texttt{/api}. The server is started with \texttt{python -m recall.server}, binds to \texttt{127.0.0.1} and reads the port from the \texttt{PORT} environment variable (default 8000). Uploads are limited to 40~MB through Flask's \texttt{MAX\_CONTENT\_LENGTH}, and an error handler returns a readable JSON message for HTTP 413.
 
 \section{Settings Validation and Error Handling}
