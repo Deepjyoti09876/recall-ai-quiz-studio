@@ -1,0 +1,7 @@
+topic,difficulty,ok,seconds,mcq,short,concepts,with_concept,mcq_with_misconceptions,with_hints,bloom_levels,verified,partial,unsupported,duplicates,answer_positions_before,answer_positions_after,error
+Operating system scheduling,Easy,1,6.5,5,2,5,7,5,7,Remember|Remember|Understand|Understand|Understand|Remember|Understand,5,0,0,0,11101,13032,
+DBMS normalization,Medium,1,4.8,5,2,5,7,0,7,Remember|Understand|Apply|Understand|Analyze|Apply|Understand,0,0,5,0,00200,31022,
+Dynamic programming,Hard,1,9.9,5,2,5,7,0,7,Understand|Analyze|Apply|Analyze|Evaluate|Analyze|Evaluate,2,1,2,0,00002,20312,
+TCP versus UDP,Medium,1,6.8,5,0,4,5,5,5,Apply|Analyze|Apply|Analyze|Understand,5,0,0,0,11112,00232,
+Binary search trees,Easy,1,4.8,5,2,5,7,1,7,Remember|Remember|Remember|Understand|Understand|Remember|Understand,5,0,0,0,00300,01320,
+Deadlock in operating systems,Hard,1,4.8,4,2,5,6,2,6,Understand|Remember|Apply|Evaluate|Analyze|Evaluate,4,0,0,0,0231,3310,
