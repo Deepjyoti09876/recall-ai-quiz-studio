@@ -77,3 +77,5 @@ report/            project report (LaTeX)
 ## Notes
 - If the web can't be reached, topic quizzes still work using the AI's own knowledge (you'll see a notice).
 - The code runner executes code on your own machine; it is meant for local use only.
+
+  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Deepjyoti09876/recall-ai-quiz-studio)
